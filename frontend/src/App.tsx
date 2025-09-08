@@ -41,16 +41,11 @@ export default function App() {
     
     // Automatically start analysis after showing success state
     if (rssStatus === 'ready') {
-      // Show success state for a brief moment
+      // Show success state for a brief moment, then hide uploader and start analyzing
       setTimeout(() => {
-        // Start analysis and hide uploader at the same time
-        setAnalyzing(true)
+        // Hide uploader and start analysis (but don't animate header yet)
         setShowUploader(false)
-        
-        // Compact header slightly after to sync with upload zone hiding animation
-        setTimeout(() => {
-          setHeaderCompact(true)
-        }, 100)
+        setAnalyzing(true)
         
         // Start the actual analysis
         setTimeout(async () => {
@@ -58,10 +53,15 @@ export default function App() {
             const base = matchReleases(map, releases)
             const final = await aiAugment(releases, base)
             setResults(final)
+            
+            // Only after analysis is complete, trigger the header animation
+            setTimeout(() => {
+              setHeaderCompact(true)
+            }, 100)
           } finally {
             setAnalyzing(false)
           }
-        }, 200)
+        }, 300)
       }, 600) // Brief delay to show success state
     } else {
       // If RSS isn't ready yet, just hide the uploader
