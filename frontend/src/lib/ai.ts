@@ -1,36 +1,24 @@
 import type { MatchResult, ReleaseItem } from './types'
 
 export function buildAiPayload(release: ReleaseItem, resourceTypes: string[]) {
-  const text = `You are matching Azure release notes to Azure Resource Manager resource types from Azure Portal. Map the single release provided to zero or more of the resource types below.\n\nImportant: Azure product names often differ from ARM types. For example: Microsoft.Logic/workflows ≈ Azure Logic Apps; Microsoft.Web/sites ≈ App Service; Microsoft.Network/publicIPAddresses ≈ Public IP addresses; Microsoft.Storage/storageAccounts ≈ Storage accounts. Prefer correct Azure product naming when reasoning, but only return the ARM types given.\n\nRelease:\nTitle: ${release.title}\nSummary: ${release.summary}\n\nARM resource types (choose from these only):\n${resourceTypes.join(', ')}\n\nReturn strictly valid JSON array with items: {"resource_type": string, "confidence": number (0-1), "impact_summary": string (<= 40 words)}. Do not include any extra keys or text.`
-  return {
-    contents: [
-      { parts: [{ text }] }
-    ]
-  }
+  // Payload expected by server-side Ollama proxy
+  return { release: { title: release.title, summary: release.summary, id: release.id, link: release.link, published: release.published }, resourceTypes }
 }
 
-export async function analyzeWithGemini(apiKey: string, payload: any) {
-  const res = await fetch(
-    'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent',
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-goog-api-key': apiKey,
-      },
-      body: JSON.stringify(payload),
-    }
-  )
-  if (!res.ok) throw new Error('Gemini call failed')
+export async function analyzeWithOllama(payload: any) {
+  const res = await fetch('/api/ai/analyze', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  })
+  if (!res.ok) throw new Error('Ollama call failed')
   return res.json()
 }
 
 export async function aiAugment(
-  apiKey: string,
   releases: ReleaseItem[],
   initial: MatchResult[]
 ): Promise<MatchResult[]> {
-  if (!apiKey) return initial
   const byType = new Map(initial.map(r => [r.resourceType, r]))
   const resourceTypes = initial.map(r => r.resourceType)
 
@@ -41,11 +29,8 @@ export async function aiAugment(
     for (const rel of batch) {
       const payload = buildAiPayload(rel, resourceTypes)
       try {
-        const out = await analyzeWithGemini(apiKey, payload)
-        // Gemini response structure: extract text from candidates
-        const text = out?.candidates?.[0]?.content?.parts?.[0]?.text ?? '[]'
-        let arr: any[] = []
-        try { arr = JSON.parse(text) } catch { arr = [] }
+        const out = await analyzeWithOllama(payload)
+        const arr: any[] = Array.isArray(out?.matches) ? out.matches : []
         for (const m of arr) {
           const rt = String(m.resource_type ?? '')
           const conf = Number(m.confidence ?? 0)

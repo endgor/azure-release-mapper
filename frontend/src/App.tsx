@@ -11,7 +11,6 @@ import type { MatchResult } from './lib/types'
 import { downloadResultsCsv } from './lib/download'
 
 export default function App() {
-  const [apiKey, setApiKey] = useState<string>(localStorage.getItem('geminiApiKey') || '')
   const [resources, setResources] = useState<Map<string, number>>(new Map())
   const [rssStatus, setRssStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const [releases, setReleases] = useState<any[]>([])
@@ -43,7 +42,8 @@ export default function App() {
     setAnalyzing(true)
     try {
       const base = matchReleases(resources, releases)
-      const final = apiKey ? await aiAugment(apiKey, releases, base) : base
+      // Always try to augment with local Ollama via server; falls back to base on error
+      const final = await aiAugment(releases, base)
       setResults(final)
     } finally {
       setAnalyzing(false)
@@ -55,7 +55,7 @@ export default function App() {
       <Header />
       <main className="container mx-auto px-4 py-6 grid gap-4 max-w-6xl">
         <section className="grid gap-4 md:grid-cols-2">
-          <ApiKeyInput onSave={setApiKey} />
+          <ApiKeyInput />
           <CsvUploader onParsed={setResources} />
         </section>
 
@@ -77,4 +77,3 @@ export default function App() {
     </div>
   )
 }
-
