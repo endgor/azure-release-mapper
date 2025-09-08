@@ -6,11 +6,11 @@ interface Props {
 }
 
 function ScoreBar({ score }: { score: number }) {
-  const percentage = Math.min(score * 10, 100) // Assuming scores are 0-10
+  const percentage = Math.min(score * 100, 100) // Scores are 0-1, so multiply by 100
   const getColor = (score: number) => {
-    if (score >= 7) return 'bg-green-500'
-    if (score >= 4) return 'bg-yellow-500'
-    return 'bg-red-500'
+    if (score >= 0.7) return 'bg-green-500'   // 70%+ = High relevance
+    if (score >= 0.5) return 'bg-yellow-500' // 50-70% = Medium relevance  
+    return 'bg-orange-500'                    // 30-50% = Lower relevance (not red since all matches are decent)
   }
 
   return (
@@ -21,23 +21,40 @@ function ScoreBar({ score }: { score: number }) {
           style={{ width: `${percentage}%` }}
         />
       </div>
-      <span className="text-xs text-slate-600 font-mono">{score.toFixed(1)}</span>
+      <span className="text-xs text-slate-600 font-mono">{Math.round(score * 100)}%</span>
     </div>
   )
 }
 
 function ImpactBadge({ level }: { level: 'high' | 'medium' | 'low' | null }) {
-  if (!level) return <span className="text-slate-400">—</span>
+  if (!level) return <span className="text-slate-400 text-xs">No matches</span>
   
-  const styles = {
-    high: 'bg-red-100 text-red-700 border-red-200',
-    medium: 'bg-yellow-100 text-yellow-700 border-yellow-200',
-    low: 'bg-green-100 text-green-700 border-green-200'
+  const config = {
+    high: { 
+      style: 'bg-green-100 text-green-700 border-green-200',
+      label: 'High Match',
+      title: '70%+ relevance - Strong keyword matches in title/summary'
+    },
+    medium: { 
+      style: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+      label: 'Good Match',
+      title: '50-70% relevance - Some keyword matches found'
+    },
+    low: { 
+      style: 'bg-orange-100 text-orange-700 border-orange-200',
+      label: 'Possible',
+      title: '30-50% relevance - Weak keyword matches or fuzzy matching'
+    }
   }
   
+  const { style, label, title } = config[level]
+  
   return (
-    <span className={`px-2 py-1 text-xs font-medium rounded-full border ${styles[level]}`}>
-      {level.toUpperCase()}
+    <span 
+      className={`px-2 py-1 text-xs font-medium rounded-full border ${style} cursor-help`}
+      title={title}
+    >
+      {label}
     </span>
   )
 }
@@ -51,12 +68,16 @@ export default function ResultsTable({ results }: Props) {
 
   return (
     <div className="card-elevated p-4 animate-fade-in">
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-start justify-between mb-4">
         <div>
           <h2 className="text-xl font-bold text-slate-800 mb-1">📋 Analysis Results</h2>
-          <p className="text-xs text-slate-600">
+          <p className="text-xs text-slate-600 mb-2">
             {results.length} resource type(s) • {results.reduce((sum, r) => sum + r.matchedReleases.length, 0)} matches found
           </p>
+          <div className="text-xs text-slate-500">
+            <span className="font-medium">Relevance Score:</span> Based on keyword matches in release titles, summaries, and categories. 
+            Only releases with 30%+ relevance are shown.
+          </div>
         </div>
       </div>
 
@@ -64,7 +85,7 @@ export default function ResultsTable({ results }: Props) {
         {sortedResults.map((result, index) => {
           const isExpanded = expanded[result.resourceType]
           const hasMatches = result.matchedReleases.length > 0
-          const impactLevel = result.overallScore >= 7 ? 'high' : result.overallScore >= 4 ? 'medium' : result.overallScore > 0 ? 'low' : null
+          const impactLevel = result.overallScore >= 0.7 ? 'high' : result.overallScore >= 0.5 ? 'medium' : result.overallScore > 0 ? 'low' : null
 
           return (
             <div 

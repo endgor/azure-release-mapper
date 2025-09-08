@@ -55,15 +55,13 @@ export default function App() {
   async function analyze() {
     if (!canAnalyze) return
     setAnalyzing(true)
+    // Compact header immediately when analysis starts
+    setHeaderCompact(true)
     try {
       const base = matchReleases(resources, releases)
       // Always try to augment with local Ollama via server; falls back to base on error
       const final = await aiAugment(releases, base)
       setResults(final)
-      // Compact header after successful analysis with a delay for smooth UX
-      setTimeout(() => {
-        setHeaderCompact(true)
-      }, 1000)
     } finally {
       setAnalyzing(false)
     }
