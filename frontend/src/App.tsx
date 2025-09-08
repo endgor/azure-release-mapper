@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import Header from './components/Header'
 import CsvUploader from './components/CsvUploader'
-import AnalyzeButton from './components/AnalyzeButton'
 import ResultsTable from './components/ResultsTable'
 import { fetchRss } from './lib/rss'
 import { matchReleases } from './lib/match'
@@ -36,14 +35,40 @@ export default function App() {
     return () => { cancelled = true }
   }, [])
 
-  const canAnalyze = useMemo(() => resources.size > 0 && rssStatus === 'ready', [resources, rssStatus])
 
-  function handleCsvParsed(map: Map<string, number>) {
+  async function handleCsvParsed(map: Map<string, number>) {
     setResources(map)
-    // Hide uploader after successful upload with a shorter delay for better UX
-    setTimeout(() => {
-      setShowUploader(false)
-    }, 800)
+    
+    // Automatically start analysis after showing success state
+    if (rssStatus === 'ready') {
+      // Show success state for a brief moment
+      setTimeout(() => {
+        // Start analysis and hide uploader at the same time
+        setAnalyzing(true)
+        setShowUploader(false)
+        
+        // Compact header slightly after to sync with upload zone hiding animation
+        setTimeout(() => {
+          setHeaderCompact(true)
+        }, 100)
+        
+        // Start the actual analysis
+        setTimeout(async () => {
+          try {
+            const base = matchReleases(map, releases)
+            const final = await aiAugment(releases, base)
+            setResults(final)
+          } finally {
+            setAnalyzing(false)
+          }
+        }, 200)
+      }, 600) // Brief delay to show success state
+    } else {
+      // If RSS isn't ready yet, just hide the uploader
+      setTimeout(() => {
+        setShowUploader(false)
+      }, 800)
+    }
   }
 
   function handleShowUploader() {
@@ -52,20 +77,6 @@ export default function App() {
     setHeaderCompact(false)
   }
 
-  async function analyze() {
-    if (!canAnalyze) return
-    setAnalyzing(true)
-    // Compact header immediately when analysis starts
-    setHeaderCompact(true)
-    try {
-      const base = matchReleases(resources, releases)
-      // Always try to augment with local Ollama via server; falls back to base on error
-      const final = await aiAugment(releases, base)
-      setResults(final)
-    } finally {
-      setAnalyzing(false)
-    }
-  }
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -82,26 +93,6 @@ export default function App() {
         {/* Action Section */}
         <section className="mb-6">
           <div className="flex flex-col sm:flex-row items-center justify-center space-y-3 sm:space-y-0 sm:space-x-4">
-            {/* Upload New File Button - shown when uploader is hidden */}
-            {!showUploader && resources.size > 0 && (
-              <button 
-                className="btn btn-ghost animate-slide-in" 
-                onClick={handleShowUploader}
-              >
-                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                </svg>
-                Upload New File
-              </button>
-            )}
-
-{resources.size > 0 && (
-              <AnalyzeButton 
-                disabled={!canAnalyze || analyzing} 
-                onClick={analyze} 
-                isAnalyzing={analyzing}
-              />
-            )}
             
             {/* Status Messages */}
             {rssStatus === 'loading' && (
@@ -112,13 +103,6 @@ export default function App() {
                 <span className="text-sm">Loading release notes...</span>
               </div>
             )}
-            
-            {rssStatus === 'ready' && !analyzing && resources.size > 0 && !showUploader && (
-              <div className="status-badge status-success">
-                {resources.size} resource type{resources.size !== 1 ? 's' : ''} loaded
-              </div>
-            )}
-
 
             {rssStatus === 'error' && (
               <div className="status-badge status-error">
@@ -126,24 +110,36 @@ export default function App() {
               </div>
             )}
 
-            {/* Download Button */}
+            {/* Action buttons - only shown after results are available */}
             {results.length > 0 && (
-              <button 
-                className="btn btn-ghost animate-slide-in" 
-                onClick={() => downloadResultsCsv(results)}
-              >
-                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-4-4m4 4l4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                Download CSV
-              </button>
+              <>
+                <button 
+                  className="btn btn-ghost animate-slide-in" 
+                  onClick={handleShowUploader}
+                >
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                  Upload New File
+                </button>
+                
+                <button 
+                  className="btn btn-ghost animate-slide-in" 
+                  onClick={() => downloadResultsCsv(results)}
+                >
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-4-4m4 4l4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Download CSV
+                </button>
+              </>
             )}
           </div>
 
           {/* Analysis Progress */}
           {analyzing && (
             <div className="mt-4 max-w-md mx-auto">
-              <div className="card p-4 animate-slide-in">
+              <div className="card p-4 animate-lift-up">
                 <div className="flex items-center space-x-3">
                   <div className="flex-shrink-0">
                     <svg className="w-5 h-5 text-blue-600 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -152,7 +148,7 @@ export default function App() {
                   </div>
                   <div>
                     <div className="text-sm font-medium text-blue-800">Analysis in progress</div>
-                    <div className="text-xs text-blue-600">Matching resources against release notes...</div>
+                    <div className="text-xs text-blue-600">Matching {resources.size} resource type{resources.size !== 1 ? 's' : ''} against release notes...</div>
                   </div>
                 </div>
               </div>
