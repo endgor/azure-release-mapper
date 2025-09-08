@@ -103,16 +103,52 @@ export default function CsvUploader({ onParsed }: Props) {
         />
         
         <div className="space-y-4">
-          <div className="w-16 h-16 mx-auto bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center">
-            <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-            </svg>
+          {/* Icon - changes based on state */}
+          <div className={`w-16 h-16 mx-auto rounded-2xl flex items-center justify-center transition-all duration-300 ${
+            fileName && !error 
+              ? 'bg-gradient-to-br from-green-500 to-emerald-600' 
+              : isProcessing 
+                ? 'bg-gradient-to-br from-blue-500 to-blue-600' 
+                : 'bg-gradient-to-br from-indigo-500 to-purple-600'
+          }`}>
+            {fileName && !error ? (
+              <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            ) : isProcessing ? (
+              <svg className="w-8 h-8 text-white animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            ) : (
+              <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+            )}
           </div>
           
-          {isProcessing ? (
+          {/* Content - changes based on state */}
+          {fileName && !error ? (
+            <div className="text-center animate-fade-in">
+              <div className="text-lg font-semibold text-green-700 mb-2">File uploaded successfully!</div>
+              <div className="text-sm text-slate-600 mb-2">{fileName}</div>
+              {uniqueCount !== null && (
+                <div className="text-sm font-medium text-green-600">
+                  {uniqueCount} resource types detected
+                </div>
+              )}
+            </div>
+          ) : isProcessing ? (
             <div className="text-center">
-              <div className="text-lg font-semibold text-slate-700">Processing CSV...</div>
+              <div className="text-lg font-semibold text-blue-700">Processing CSV...</div>
               <div className="text-sm text-slate-500">Analyzing your Azure resources</div>
+            </div>
+          ) : error ? (
+            <div className="text-center">
+              <div className="text-lg font-semibold text-red-700 mb-2">Upload failed</div>
+              <div className="text-sm text-red-600 mb-4">{error}</div>
+              <button className="btn btn-secondary">
+                Try Again
+              </button>
             </div>
           ) : (
             <div className="text-center">
@@ -127,46 +163,6 @@ export default function CsvUploader({ onParsed }: Props) {
           )}
         </div>
       </div>
-
-      {fileName && (
-        <div className="mt-4 p-4 bg-green-50/50 border border-green-200 rounded-xl animate-slide-in">
-          <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center">
-              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <div>
-              <div className="text-sm font-medium text-green-800">File uploaded successfully</div>
-              <div className="text-xs text-green-600">{fileName}</div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {uniqueCount !== null && (
-        <div className="mt-3 p-3 bg-blue-50/50 border border-blue-200 rounded-xl animate-slide-in">
-          <div className="flex items-center space-x-2">
-            <div className="status-badge status-success">
-              <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
-              {uniqueCount} resource types detected
-            </div>
-          </div>
-        </div>
-      )}
-
-      {error && (
-        <div className="mt-3 p-3 bg-red-50/50 border border-red-200 rounded-xl animate-slide-in">
-          <div className="flex items-center space-x-2">
-            <svg className="w-4 h-4 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-            </svg>
-            <div className="text-sm text-red-700">{error}</div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

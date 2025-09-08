@@ -40,10 +40,10 @@ export default function App() {
 
   function handleCsvParsed(map: Map<string, number>) {
     setResources(map)
-    // Hide uploader after successful upload with a delay for better UX
+    // Hide uploader after successful upload with a shorter delay for better UX
     setTimeout(() => {
       setShowUploader(false)
-    }, 1500)
+    }, 800)
   }
 
   function handleShowUploader() {
