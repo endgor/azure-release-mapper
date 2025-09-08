@@ -14,14 +14,14 @@ function ScoreBar({ score }: { score: number }) {
   }
 
   return (
-    <div className="flex items-center space-x-2">
-      <div className="w-16 h-2 bg-slate-200 rounded-full overflow-hidden">
+    <div className="flex items-center space-x-1">
+      <div className="w-12 h-1.5 bg-slate-200 rounded-full overflow-hidden">
         <div 
           className={`h-full rounded-full transition-all duration-300 ${getColor(score)}`}
           style={{ width: `${percentage}%` }}
         />
       </div>
-      <span className="text-xs text-slate-600 font-mono">{score.toFixed(2)}</span>
+      <span className="text-xs text-slate-600 font-mono">{score.toFixed(1)}</span>
     </div>
   )
 }
@@ -50,17 +50,17 @@ export default function ResultsTable({ results }: Props) {
   const sortedResults = [...results].sort((a, b) => b.overallScore - a.overallScore)
 
   return (
-    <div className="card-elevated p-6 animate-fade-in">
-      <div className="flex items-center justify-between mb-6">
+    <div className="card-elevated p-4 animate-fade-in">
+      <div className="flex items-center justify-between mb-4">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800 mb-2">📋 Analysis Results</h2>
-          <p className="text-sm text-slate-600">
-            {results.length} resource type(s) analyzed • {results.reduce((sum, r) => sum + r.matchedReleases.length, 0)} total matches found
+          <h2 className="text-xl font-bold text-slate-800 mb-1">📋 Analysis Results</h2>
+          <p className="text-xs text-slate-600">
+            {results.length} resource type(s) • {results.reduce((sum, r) => sum + r.matchedReleases.length, 0)} matches found
           </p>
         </div>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-2">
         {sortedResults.map((result, index) => {
           const isExpanded = expanded[result.resourceType]
           const hasMatches = result.matchedReleases.length > 0
@@ -69,17 +69,17 @@ export default function ResultsTable({ results }: Props) {
           return (
             <div 
               key={result.resourceType} 
-              className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all duration-200"
-              style={{ animationDelay: `${index * 0.1}s` }}
+              className="bg-white rounded-lg border border-slate-200 shadow-sm hover:shadow-md transition-all duration-200"
+              style={{ animationDelay: `${index * 0.05}s` }}
             >
-              <div className="p-6">
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
+              <div className="p-3">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-center">
                   {/* Resource Type */}
-                  <div className="lg:col-span-4">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-3 h-3 bg-indigo-500 rounded-full flex-shrink-0" />
-                      <div>
-                        <div className="font-mono text-sm font-semibold text-slate-800 break-all">
+                  <div className="lg:col-span-5">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-2 h-2 bg-indigo-500 rounded-full flex-shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <div className="font-mono text-xs font-semibold text-slate-800 truncate" title={result.resourceType}>
                           {result.resourceType}
                         </div>
                         <div className="text-xs text-slate-500">
@@ -91,10 +91,8 @@ export default function ResultsTable({ results }: Props) {
 
                   {/* Matches */}
                   <div className="lg:col-span-2">
-                    <div className="flex items-center space-x-2">
-                      <div className="status-badge bg-blue-100 text-blue-800">
-                        {result.matchedReleases.length} match{result.matchedReleases.length !== 1 ? 'es' : ''}
-                      </div>
+                    <div className="status-badge bg-blue-100 text-blue-800 text-xs px-2 py-1">
+                      {result.matchedReleases.length}
                     </div>
                   </div>
 
@@ -104,7 +102,7 @@ export default function ResultsTable({ results }: Props) {
                   </div>
 
                   {/* Score */}
-                  <div className="lg:col-span-3">
+                  <div className="lg:col-span-2">
                     <ScoreBar score={result.overallScore} />
                   </div>
 
@@ -112,11 +110,11 @@ export default function ResultsTable({ results }: Props) {
                   <div className="lg:col-span-1 flex justify-end">
                     {hasMatches && (
                       <button
-                        className="btn btn-ghost text-sm"
+                        className="p-1 hover:bg-slate-100 rounded transition-colors"
                         onClick={() => setExpanded(s => ({ ...s, [result.resourceType]: !s[result.resourceType] }))}
                       >
                         <svg 
-                          className={`w-4 h-4 transform transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                          className={`w-3 h-3 transform transition-transform ${isExpanded ? 'rotate-180' : ''} text-slate-600`}
                           fill="none" 
                           stroke="currentColor" 
                           viewBox="0 0 24 24"
@@ -130,8 +128,8 @@ export default function ResultsTable({ results }: Props) {
 
                 {/* Top Impact Summary */}
                 {result.topImpactSummary && (
-                  <div className="mt-4 p-3 bg-slate-50 rounded-lg">
-                    <div className="text-sm text-slate-700">
+                  <div className="mt-2 p-2 bg-slate-50 rounded-md">
+                    <div className="text-xs text-slate-700">
                       <strong>Key Impact:</strong> {result.topImpactSummary}
                     </div>
                   </div>
@@ -140,33 +138,35 @@ export default function ResultsTable({ results }: Props) {
 
               {/* Expanded Details */}
               {isExpanded && (
-                <div className="px-6 pb-6 animate-slide-in">
-                  <div className="border-t border-slate-200 pt-4 space-y-4">
+                <div className="px-3 pb-3 animate-slide-in">
+                  <div className="border-t border-slate-200 pt-2 space-y-2">
                     {result.matchedReleases.map((match, matchIndex) => (
-                      <div key={match.id} className="bg-gradient-to-r from-slate-50/50 to-white rounded-lg p-4 border border-slate-100">
-                        <div className="flex items-start justify-between mb-3">
+                      <div key={match.id} className="bg-gradient-to-r from-slate-50/50 to-white rounded-md p-3 border border-slate-100">
+                        <div className="flex items-start justify-between mb-2">
                           <a 
-                            className="text-indigo-600 hover:text-indigo-800 font-medium text-sm hover:underline transition-colors" 
+                            className="text-indigo-600 hover:text-indigo-800 font-medium text-xs hover:underline transition-colors flex-1 mr-3" 
                             href={match.link} 
                             target="_blank" 
                             rel="noreferrer"
                           >
                             {match.title}
                           </a>
-                          <div className="flex items-center space-x-2 flex-shrink-0 ml-4">
+                          <div className="flex items-center space-x-2 flex-shrink-0">
                             <span className="text-xs text-slate-500">
                               {new Date(match.published).toLocaleDateString()}
                             </span>
-                            <ScoreBar score={match.relevanceScore} />
+                            <div className="w-12">
+                              <ScoreBar score={match.relevanceScore} />
+                            </div>
                           </div>
                         </div>
 
                         {match.aiSummary && (
-                          <div className="mb-3 p-3 bg-blue-50/50 border border-blue-100 rounded-md">
-                            <div className="text-sm text-slate-700">{match.aiSummary}</div>
+                          <div className="mb-2 p-2 bg-blue-50/50 border border-blue-100 rounded-md">
+                            <div className="text-xs text-slate-700">{match.aiSummary}</div>
                             {match.aiConfidence != null && (
                               <div className="text-xs text-blue-600 mt-1">
-                                AI Confidence: {(match.aiConfidence * 100).toFixed(0)}%
+                                AI: {(match.aiConfidence * 100).toFixed(0)}%
                               </div>
                             )}
                           </div>
@@ -177,7 +177,7 @@ export default function ResultsTable({ results }: Props) {
                             {match.reasons.map((reason, reasonIndex) => (
                               <span 
                                 key={reasonIndex}
-                                className="px-2 py-1 bg-indigo-100 text-indigo-700 text-xs rounded-full"
+                                className="px-1.5 py-0.5 bg-indigo-100 text-indigo-700 text-xs rounded-full"
                               >
                                 {reason}
                               </span>

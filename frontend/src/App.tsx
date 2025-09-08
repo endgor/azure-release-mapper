@@ -16,6 +16,7 @@ export default function App() {
   const [results, setResults] = useState<MatchResult[]>([])
   const [analyzing, setAnalyzing] = useState(false)
   const [showUploader, setShowUploader] = useState(true)
+  const [headerCompact, setHeaderCompact] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -47,6 +48,8 @@ export default function App() {
 
   function handleShowUploader() {
     setShowUploader(true)
+    // Optionally expand header again when showing uploader
+    setHeaderCompact(false)
   }
 
   async function analyze() {
@@ -57,6 +60,10 @@ export default function App() {
       // Always try to augment with local Ollama via server; falls back to base on error
       const final = await aiAugment(releases, base)
       setResults(final)
+      // Compact header after successful analysis with a delay for smooth UX
+      setTimeout(() => {
+        setHeaderCompact(true)
+      }, 1000)
     } finally {
       setAnalyzing(false)
     }
@@ -64,9 +71,9 @@ export default function App() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Header />
+      <Header isCompact={headerCompact} />
       
-      <main className="flex-1 container mx-auto px-6 py-8 max-w-5xl">
+      <main className="flex-1 container mx-auto px-6 py-8 max-w-7xl">
         {/* File Upload Section - Conditionally shown with animation */}
         <section className={`${showUploader ? 'upload-section-expanded' : 'upload-section-collapsed'}`}>
           <div className="max-w-2xl mx-auto">

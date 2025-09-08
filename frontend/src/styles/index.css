@@ -78,6 +78,70 @@
   transform: translateY(0);
 }
 
+.header-expanded {
+  transition: all 0.6s ease-out;
+  padding-top: 3rem;
+  padding-bottom: 4rem;
+}
+
+.header-compact {
+  transition: all 0.6s ease-out;
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+}
+
+.header-title-expanded {
+  transition: all 0.6s ease-out;
+  font-size: 2.25rem;
+  line-height: 2.5rem;
+  margin-bottom: 1rem;
+}
+
+.header-title-compact {
+  transition: all 0.6s ease-out;
+  font-size: 1.5rem;
+  line-height: 2rem;
+  margin-bottom: 0;
+}
+
+.header-description {
+  transition: all 0.6s ease-out;
+  opacity: 1;
+  max-height: 200px;
+  overflow: hidden;
+}
+
+.header-description-hidden {
+  transition: all 0.6s ease-out;
+  opacity: 0;
+  max-height: 0;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+}
+
+.header-decorations {
+  transition: all 0.6s ease-out;
+  opacity: 0.7;
+}
+
+.header-decorations-hidden {
+  transition: all 0.6s ease-out;
+  opacity: 0;
+}
+
+@media (min-width: 1024px) {
+  .header-title-expanded {
+    font-size: 3rem;
+    line-height: 1;
+  }
+  
+  .header-title-compact {
+    font-size: 1.875rem;
+    line-height: 2.25rem;
+  }
+}
+
 .btn {
   @apply inline-flex items-center justify-center rounded-xl px-6 py-3 text-sm font-semibold transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98];
 }
