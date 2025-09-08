@@ -20,8 +20,8 @@ RUN npm run build
 FROM node:20-bookworm-slim
 
 # Install curl and dependencies, then install Ollama
-RUN apt-get update && apt-get install -y curl ca-certificates && rm -rf /var/lib/apt/lists/* \
-    && curl -fsSL https://ollama.com/download/linux | sh
+RUN apt-get update && apt-get install -y bash curl ca-certificates && rm -rf /var/lib/apt/lists/* \
+    && curl -fsSL https://ollama.com/install.sh | sh
 
 ENV NODE_ENV=production \
     PORT=8787 \
@@ -47,4 +47,3 @@ RUN chmod +x /app/start.sh
 EXPOSE 8787
 
 CMD ["/app/start.sh"]
-
