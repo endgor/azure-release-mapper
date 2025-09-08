@@ -21,9 +21,6 @@ resource law 'Microsoft.OperationalInsights/workspaces@2022-10-01' = {
   location: location
   properties: {
     retentionInDays: 30
-    features: {
-      disableLocalAuth: false
-    }
   }
 }
 
@@ -39,15 +36,6 @@ resource env 'Microsoft.App/managedEnvironments@2024-03-01' = {
         sharedKey: law.listKeys().primarySharedKey
       }
     }
-    // Enable v2 workload profile model for Consumption (allows up to 4 vCPU/8Gi per replica when supported)
-    workloadProfiles: [
-      {
-        name: 'Consumption'
-        workloadProfileType: 'Consumption'
-        minimumCount: 0
-        maximumCount: 3
-      }
-    ]
   }
 }
 
@@ -63,7 +51,6 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
   name: containerAppName
   location: location
   properties: {
-    workloadProfileName: 'Consumption'
     managedEnvironmentId: env.id
     configuration: {
       ingress: {
@@ -105,8 +92,8 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
             }
           ]
           resources: {
-            cpu: 4
-            memory: '8Gi'
+            cpu: 2
+            memory: '4Gi'
           }
         }
       ]
