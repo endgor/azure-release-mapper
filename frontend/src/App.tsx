@@ -16,6 +16,7 @@ export default function App() {
   const [analyzing, setAnalyzing] = useState(false)
   const [showUploader, setShowUploader] = useState(true)
   const [headerCompact, setHeaderCompact] = useState(false)
+  const [uploaderKey, setUploaderKey] = useState(0)
 
   useEffect(() => {
     let cancelled = false
@@ -75,6 +76,8 @@ export default function App() {
     setShowUploader(true)
     // Optionally expand header again when showing uploader
     setHeaderCompact(false)
+    // Reset the uploader by changing its key
+    setUploaderKey(prev => prev + 1)
   }
 
 
@@ -86,7 +89,7 @@ export default function App() {
         {/* File Upload Section - Conditionally shown with animation */}
         <section className={`${showUploader ? 'upload-section-expanded' : 'upload-section-collapsed'}`}>
           <div className="max-w-2xl mx-auto">
-            <CsvUploader onParsed={handleCsvParsed} />
+            <CsvUploader key={uploaderKey} onParsed={handleCsvParsed} />
           </div>
         </section>
 
