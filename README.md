@@ -38,8 +38,28 @@ Location: `westeurope`
 - `az acr login --name acrcloudopsreleasemapper`
 - `docker push acrcloudopsreleasemapper.azurecr.io/cloudops-release-mapper:latest`
 
-2) Deploy infra with Bicep (subscription scope)
-- `az deployment sub create -l westeurope -f infra/main.bicep -p infra/main.bicepparam`
+2) Option A — Build in Bicep with ACR Build
+- Ensure your repo is publicly accessible or provide a URL including a token.
+- Edit `infra/main.bicepparam` and set:
+  - `doBuild = true`
+  - `sourceRepoUrl = 'https://github.com/<org>/<repo>.git#<branch>'`
+- Deploy infra (subscription scope). This will create RG + ACR, build and push the image in ACR, then create the Container App referencing that image:
+  - `az deployment sub create -l westeurope -f infra/main.bicep -p infra/main.bicepparam`
+
+3) Option B — Manual build then deploy
+- Create RG and ACR first:
+  - `az group create -n rg-cloudops-release-mapper -l westeurope`
+  - `az acr create -n acrcloudopsreleasemapper -g rg-cloudops-release-mapper --sku Basic`
+- Build and push the image (two choices):
+  - Using ACR Build from this directory:
+    - `az acr build -r acrcloudopsreleasemapper -t acrcloudopsreleasemapper.azurecr.io/cloudops-release-mapper:latest .`
+  - Or local Docker then push:
+    - `docker build -t cloudops-release-mapper:latest .`
+    - `docker tag cloudops-release-mapper:latest acrcloudopsreleasemapper.azurecr.io/cloudops-release-mapper:latest`
+    - `az acr login --name acrcloudopsreleasemapper`
+    - `docker push acrcloudopsreleasemapper.azurecr.io/cloudops-release-mapper:latest`
+- Deploy infra (subscription scope), referencing the pushed tag:
+  - `az deployment sub create -l westeurope -f infra/main.bicep -p infra/main.bicepparam -p containerImageTag=latest`
 
 3) Open the Container App URL output in the portal or via CLI
 
@@ -47,4 +67,4 @@ Notes
 - The container runs the Node API and a local Ollama server (Phi-3.5 mini) in one process using `start.sh`.
 - The frontend is served statically by the Node API; AI calls are sent to `/api/ai/analyze` which proxies to `127.0.0.1:11434`.
 - No cloud AI services or API keys are used.
-- On the Container Apps Consumption environment, per-replica limits cap at 2 vCPU / 4 Gi. The Bicep sets these values to meet platform limits. If you require 4 vCPU / 8 Gi, switch to a Dedicated workload profile and set `workloadProfileName` accordingly.
+- If your region supports up to 4 vCPU / 8 GiB on Consumption, the Bicep selects the Consumption workload profile and requests 4/8. If deployment fails due to limits, reduce to 2 vCPU / 4 GiB in `infra/containerapp.bicep` or switch to a Dedicated profile.

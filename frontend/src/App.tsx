@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
 import Header from './components/Header'
-import ApiKeyInput from './components/ApiKeyInput'
 import CsvUploader from './components/CsvUploader'
 import AnalyzeButton from './components/AnalyzeButton'
 import ResultsTable from './components/ResultsTable'
@@ -55,7 +54,17 @@ export default function App() {
       <Header />
       <main className="container mx-auto px-4 py-6 grid gap-4 max-w-6xl">
         <section className="grid gap-4 md:grid-cols-2">
-          <ApiKeyInput />
+          <div className="card p-4">
+            <div className="flex flex-col gap-2">
+              <div className="flex-1">
+                <label className="block text-sm font-medium text-slate-700">AI Engine</label>
+                <div className="mt-1 text-sm">
+                  Using local Ollama (Phi-3.5 mini) inside the container. No API key required.
+                </div>
+                <p className="text-xs text-slate-500 mt-1">All AI analysis runs locally via the embedded Ollama service. No data leaves the container.</p>
+              </div>
+            </div>
+          </div>
           <CsvUploader onParsed={setResources} />
         </section>
 
