@@ -193,17 +193,33 @@ export default function ResultsTable({ results }: Props) {
                           </div>
                         )}
 
-                        {match.reasons && match.reasons.length > 0 && (
+                        {/* Prefer RSS categories as tags; fall back to reasons */}
+                        {(match.categories?.length || 0) > 0 ? (
                           <div className="flex flex-wrap gap-1">
-                            {match.reasons.map((reason, reasonIndex) => (
-                              <span 
-                                key={reasonIndex}
+                            {match.categories!.map((cat, idx) => (
+                              <span
+                                key={idx}
                                 className="px-1.5 py-0.5 bg-indigo-100 text-indigo-700 text-xs rounded-full"
+                                title="Feed tag"
                               >
-                                {reason}
+                                {cat}
                               </span>
                             ))}
                           </div>
+                        ) : (
+                          match.reasons && match.reasons.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              {match.reasons.map((reason, reasonIndex) => (
+                                <span 
+                                  key={reasonIndex}
+                                  className="px-1.5 py-0.5 bg-indigo-100 text-indigo-700 text-xs rounded-full"
+                                  title="Match reason"
+                                >
+                                  {reason}
+                                </span>
+                              ))}
+                            </div>
+                          )
                         )}
                       </div>
                     ))}
@@ -217,4 +233,3 @@ export default function ResultsTable({ results }: Props) {
     </div>
   )
 }
-

@@ -14,6 +14,7 @@ export interface MatchRelease {
   published: string
   relevanceScore: number
   reasons: string[]
+  categories?: string[]
   aiSummary?: string
   aiConfidence?: number
 }
@@ -25,4 +26,3 @@ export interface MatchResult {
   topImpactSummary?: string
   overallScore: number
 }
-

@@ -114,7 +114,8 @@ export function matchReleases(
           link: rel.link,
           published: rel.published,
           relevanceScore: s,
-          reasons
+          reasons,
+          categories: rel.categories || []
         })
       }
     }
