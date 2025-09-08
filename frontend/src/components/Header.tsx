@@ -6,9 +6,9 @@ export default function Header({ isCompact = false }: HeaderProps) {
   return (
     <header className="relative overflow-hidden">
       <div 
-        className="absolute inset-0 bg-gradient-to-r from-indigo-600 via-purple-600 to-blue-600"
+        className="absolute inset-0 bg-gradient-to-r from-sky-600 via-blue-600 to-blue-700"
         style={{
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 50%, #667eea 100%)',
+          background: 'linear-gradient(135deg, #0693e3 0%, #2563eb 50%, #0369a1 100%)',
         }}
       />
       <div className="absolute inset-0 bg-black/10" />

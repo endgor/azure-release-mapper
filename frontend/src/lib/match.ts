@@ -120,12 +120,12 @@ export function matchReleases(
       }
     }
 
-    // Sort by published date desc, then by score desc
+    // Sort by score (desc) primarily, then by published date (desc)
     matches.sort((a, b) => {
+      if (b.relevanceScore !== a.relevanceScore) return b.relevanceScore - a.relevanceScore
       const ta = Date.parse(a.published || '') || 0
       const tb = Date.parse(b.published || '') || 0
-      if (tb !== ta) return tb - ta
-      return b.relevanceScore - a.relevanceScore
+      return tb - ta
     })
     const overall = matches.length ? Math.max(...matches.map(m => m.relevanceScore)) : 0
     results.push({

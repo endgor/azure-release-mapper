@@ -109,7 +109,7 @@ export default function CsvUploader({ onParsed }: Props) {
               ? 'bg-gradient-to-br from-green-500 to-emerald-600' 
               : isProcessing 
                 ? 'bg-gradient-to-br from-blue-500 to-blue-600' 
-                : 'bg-gradient-to-br from-indigo-500 to-purple-600'
+                : 'bg-gradient-to-br from-sky-500 to-blue-600'
           }`}>
             {fileName && !error ? (
               <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">

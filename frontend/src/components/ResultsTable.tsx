@@ -5,6 +5,33 @@ interface Props {
   results: MatchResult[]
 }
 
+function getTagClasses(tag: string): string {
+  const t = tag.toLowerCase()
+  if (/(launched|generally available|general availability|\bga\b)/.test(t)) {
+    return 'bg-green-100 text-green-800 border border-green-200'
+  }
+  if (/(in preview|public preview|private preview|preview)/.test(t)) {
+    return 'bg-amber-100 text-amber-800 border border-amber-200'
+  }
+  if (/(deprecated|retired|retirement|end of support|removal)/.test(t)) {
+    return 'bg-rose-100 text-rose-800 border border-rose-200'
+  }
+  if (/(breaking change|breaking)/.test(t)) {
+    return 'bg-red-100 text-red-800 border border-red-200'
+  }
+  if (/(security|vulnerability|cve)/.test(t)) {
+    return 'bg-red-100 text-red-800 border border-red-200'
+  }
+  if (/(update|improvement|enhancement|enhanced|improved)/.test(t)) {
+    return 'bg-blue-100 text-blue-800 border border-blue-200'
+  }
+  if (/(bug|fix|resolved)/.test(t)) {
+    return 'bg-teal-100 text-teal-800 border border-teal-200'
+  }
+  // Default/product tags
+  return 'bg-indigo-100 text-indigo-700 border border-indigo-200'
+}
+
 function ScoreBar({ score }: { score: number }) {
   const percentage = Math.min(score * 100, 100) // Scores are 0-1, so multiply by 100
   const getColor = (score: number) => {
@@ -165,7 +192,7 @@ export default function ResultsTable({ results }: Props) {
                       <div key={match.id} className="bg-gradient-to-r from-slate-50/50 to-white rounded-md p-3 border border-slate-100">
                         <div className="flex items-start justify-between mb-2">
                           <a 
-                            className="text-indigo-600 hover:text-indigo-800 font-medium text-xs hover:underline transition-colors flex-1 mr-3" 
+                            className="text-slate-900 hover:text-slate-700 font-medium text-xs hover:underline transition-colors flex-1 mr-3" 
                             href={match.link} 
                             target="_blank" 
                             rel="noreferrer"
@@ -199,7 +226,7 @@ export default function ResultsTable({ results }: Props) {
                             {match.categories!.map((cat, idx) => (
                               <span
                                 key={idx}
-                                className="px-1.5 py-0.5 bg-indigo-100 text-indigo-700 text-xs rounded-full"
+                                className={`px-1.5 py-0.5 text-xs rounded-full ${getTagClasses(cat)}`}
                                 title="Feed tag"
                               >
                                 {cat}
@@ -212,7 +239,7 @@ export default function ResultsTable({ results }: Props) {
                               {match.reasons.map((reason, reasonIndex) => (
                                 <span 
                                   key={reasonIndex}
-                                  className="px-1.5 py-0.5 bg-indigo-100 text-indigo-700 text-xs rounded-full"
+                                  className="px-1.5 py-0.5 bg-slate-100 text-slate-700 border border-slate-200 text-xs rounded-full"
                                   title="Match reason"
                                 >
                                   {reason}
