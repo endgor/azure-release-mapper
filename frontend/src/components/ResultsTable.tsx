@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { MatchResult } from '../lib/types'
 
 interface Props {
@@ -91,6 +91,9 @@ export default function ResultsTable({ results }: Props) {
   const [openMonthDropdown, setOpenMonthDropdown] = useState(false)
   const [openStatusDropdown, setOpenStatusDropdown] = useState(false)
   const [openTagsDropdown, setOpenTagsDropdown] = useState(false)
+  const monthRef = useRef<HTMLDivElement | null>(null)
+  const statusRef = useRef<HTMLDivElement | null>(null)
+  const tagsRef = useRef<HTMLDivElement | null>(null)
   // Selected months as numbers 1-12. Empty = All months
   const [selectedMonths, setSelectedMonths] = useState<number[]>([])
   // Selected statuses. Empty = All statuses
@@ -162,6 +165,18 @@ export default function ResultsTable({ results }: Props) {
     })
   }
   const selectAllTags = () => setSelectedTags([])
+
+  // Close dropdowns on outside click
+  useEffect(() => {
+    function onDocMouseDown(e: MouseEvent) {
+      const t = e.target as Node
+      if (openMonthDropdown && monthRef.current && !monthRef.current.contains(t)) setOpenMonthDropdown(false)
+      if (openStatusDropdown && statusRef.current && !statusRef.current.contains(t)) setOpenStatusDropdown(false)
+      if (openTagsDropdown && tagsRef.current && !tagsRef.current.contains(t)) setOpenTagsDropdown(false)
+    }
+    document.addEventListener('mousedown', onDocMouseDown)
+    return () => document.removeEventListener('mousedown', onDocMouseDown)
+  }, [openMonthDropdown, openStatusDropdown, openTagsDropdown])
 
   if (!results.length) return null
 
@@ -239,7 +254,7 @@ export default function ResultsTable({ results }: Props) {
         {/* Filters */}
         <div className="flex items-center gap-2">
           {/* Month filter */}
-          <div className="relative">
+          <div className="relative" ref={monthRef}>
           <button
             type="button"
             onClick={() => setOpenMonthDropdown(o => !o)}
@@ -290,7 +305,7 @@ export default function ResultsTable({ results }: Props) {
           </div>
 
           {/* Status filter */}
-          <div className="relative">
+          <div className="relative" ref={statusRef}>
             <button
               type="button"
               onClick={() => setOpenStatusDropdown(o => !o)}
@@ -344,7 +359,7 @@ export default function ResultsTable({ results }: Props) {
           </div>
 
           {/* Tags filter */}
-          <div className="relative">
+          <div className="relative" ref={tagsRef}>
             <button
               type="button"
               onClick={() => setOpenTagsDropdown(o => !o)}
