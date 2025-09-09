@@ -1,4 +1,5 @@
 import Papa from 'papaparse'
+import type { RegionAwareInventory } from './types'
 
 export interface ResourceTypeCount {
   type: string
@@ -96,3 +97,87 @@ export async function parseResourceCsv(file: File): Promise<Map<string, number>>
 
 // Back-compat: keep old name as alias
 export const parseAzureCsv = parseResourceCsv
+
+// --- Region-aware parsing ---
+
+function normalizeRegion(v?: string): string {
+  const s = String(v || '').toLowerCase().trim()
+  if (!s) return ''
+  // Normalize common punctuation/spacing
+  const t = s.replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim()
+  // Map a few known short forms and variants
+  const map: Record<string, string> = {
+    'weu': 'west europe',
+    'westeurope': 'west europe',
+    'ne': 'north europe',
+    'northeurope': 'north europe',
+    'swedencentral': 'sweden central',
+    'se': 'sweden central',
+    'sea': 'southeast asia',
+    'southeastasia': 'southeast asia',
+    'eastus': 'east us',
+    'eastus2': 'east us 2',
+    'westus': 'west us',
+    'westus2': 'west us 2',
+    'uksouth': 'uk south',
+    'ukwest': 'uk west',
+    'northeurope (ireland)': 'north europe',
+  }
+  if (map[t]) return map[t]
+  return t
+}
+
+function getRegionField(row: any): string {
+  // Try common headers for Azure exports and CloudOps
+  const candidates = [
+    'Location', 'location', 'Region', 'region', 'azure_region', 'Azure Region', 'geo', 'Geography'
+  ]
+  for (const k of candidates) {
+    if (row?.[k] != null && row[k] !== '') return normalizeRegion(String(row[k]))
+    // try normalized header match
+    for (const rk of Object.keys(row || {})) {
+      if (normalizeHeader(rk) === normalizeHeader(k)) {
+        const v = row[rk]
+        if (v != null && v !== '') return normalizeRegion(String(v))
+      }
+    }
+  }
+  return ''
+}
+
+export async function parseResourceCsvWithRegions(file: File): Promise<RegionAwareInventory> {
+  return new Promise((resolve, reject) => {
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: (res) => {
+        const byType = new Map<string, number>()
+        const regions = new Set<string>()
+        const rows = (res.data as any[]) || []
+        const headers: string[] = (res.meta?.fields as string[]) || []
+
+        const azure = isAzureAllResources(headers)
+        const cloudops = isCloudOpsExport(headers)
+
+        for (const row of rows) {
+          let rt = ''
+          if (azure) {
+            rt = toResourceTypeFromAzure(row)
+          } else if (cloudops) {
+            rt = toResourceTypeFromCloudOps(row)
+          } else {
+            rt = toResourceTypeFromAzure(row) || toResourceTypeFromCloudOps(row)
+          }
+          rt = String(rt || '').trim()
+          if (!rt) continue
+          byType.set(rt, (byType.get(rt) ?? 0) + 1)
+
+          const region = getRegionField(row)
+          if (region) regions.add(region)
+        }
+        resolve({ byType, regions })
+      },
+      error: (err) => reject(err)
+    })
+  })
+}

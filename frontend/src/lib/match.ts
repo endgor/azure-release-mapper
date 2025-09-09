@@ -1,5 +1,5 @@
 import Fuse from 'fuse.js'
-import type { ReleaseItem, MatchRelease, MatchResult } from './types'
+import type { ReleaseItem, MatchRelease, MatchResult, RegionAwareInventory } from './types'
 
 function splitResourceType(rt: string) {
   // Format: Microsoft.Provider/resourceName[/child]
@@ -121,6 +121,131 @@ export function matchReleases(
     }
 
     // Sort by score (desc) primarily, then by published date (desc)
+    matches.sort((a, b) => {
+      if (b.relevanceScore !== a.relevanceScore) return b.relevanceScore - a.relevanceScore
+      const ta = Date.parse(a.published || '') || 0
+      const tb = Date.parse(b.published || '') || 0
+      return tb - ta
+    })
+    const overall = matches.length ? Math.max(...matches.map(m => m.relevanceScore)) : 0
+    results.push({
+      resourceType: rt,
+      resourceCount: count,
+      matchedReleases: matches,
+      overallScore: overall
+    })
+  }
+  return results.sort((a, b) => (b.overallScore - a.overallScore) || (b.resourceCount - a.resourceCount))
+}
+
+// --- Region-aware extensions ---
+
+// Minimal Azure region list and common synonyms for detection in free text
+const REGION_KEYWORDS: Record<string, string[]> = {
+  'west europe': ['west europe', 'westeurope'],
+  'north europe': ['north europe', 'northeurope', 'ireland'],
+  'sweden central': ['sweden central', 'swedencentral'],
+  'sweden south': ['sweden south', 'swedensouth'],
+  'east us': ['east us', 'eastus'],
+  'east us 2': ['east us 2', 'eastus 2', 'eastus2'],
+  'west us': ['west us', 'westus'],
+  'west us 2': ['west us 2', 'westus 2', 'westus2'],
+  'uk south': ['uk south', 'uksouth'],
+  'uk west': ['uk west', 'ukwest'],
+  'southeast asia': ['southeast asia', 'southeastasia', 'singapore'],
+  'east asia': ['east asia', 'hong kong'],
+  'japan east': ['japan east', 'tokyo'],
+  'japan west': ['japan west', 'osaka'],
+  'australia east': ['australia east', 'sydney'],
+  'australia southeast': ['australia southeast', 'melbourne'],
+  'central india': ['central india', 'pune'],
+  'south india': ['south india', 'chennai'],
+  'india south': ['india south', 'chennai'],
+  'india central': ['india central', 'pune'],
+  'korea central': ['korea central', 'seoul'],
+  'canada central': ['canada central', 'toronto'],
+  'brazil south': ['brazil south', 'sao paulo'],
+  'germany west central': ['germany west central', 'frankfurt'],
+  'switzerland north': ['switzerland north', 'zurich'],
+  'france central': ['france central', 'paris'],
+  'norway east': ['norway east', 'oslo'],
+  'uae north': ['uae north', 'dubai'],
+  'south africa north': ['south africa north', 'johannesburg'],
+  'qatar central': ['qatar central', 'doha'],
+  'indonesia': ['indonesia', 'indonesia central', 'indonesia west'],
+  'malaysia': ['malaysia', 'malaysia south', 'malaysia west'],
+}
+
+function extractMentionedRegions(text: string): Set<string> {
+  const t = text.toLowerCase()
+  const out = new Set<string>()
+  for (const [canonical, tokens] of Object.entries(REGION_KEYWORDS)) {
+    for (const tok of tokens) {
+      if (t.includes(tok)) { out.add(canonical); break }
+    }
+  }
+  return out
+}
+
+function adjustForRegions(baseScore: number, rel: ReleaseItem, userRegions: Set<string>, reasons: string[]): number {
+  const regions = new Set<string>()
+  const add = (s?: string) => { for (const r of extractMentionedRegions(String(s || ''))) regions.add(r) }
+  add(rel.title)
+  add(rel.summary)
+  // Categories sometimes contain geography; include them too
+  for (const c of (rel as any).categories || []) add(String(c))
+
+  if (regions.size === 0) return baseScore // not region-specific → no adjustment
+
+  const hasOverlap = Array.from(regions).some(r => userRegions.has(r))
+  if (!hasOverlap) {
+    reasons.push('region mismatch')
+    return Math.max(0, baseScore * 0.6) // down-weight if only other regions are mentioned
+  } else {
+    reasons.push('region match')
+    return Math.min(1, baseScore + 0.1) // small boost when explicitly in-customer regions
+  }
+}
+
+export function matchReleasesRegional(
+  inventory: RegionAwareInventory,
+  releases: ReleaseItem[],
+  threshold = 0.3
+): MatchResult[] {
+  const { byType, regions: userRegions } = inventory
+  const results: MatchResult[] = []
+  for (const [rt, count] of byType.entries()) {
+    const { provider, resource } = splitResourceType(rt)
+    const resourceWords = toWords(resource).split(' ').filter(Boolean)
+    const resourceTokens = tokensFromResource(resource)
+    const providerTokens = tokensFromProvider(provider, resourceWords)
+
+    const matches: MatchRelease[] = []
+    for (const rel of releases) {
+      const reasons: string[] = []
+      let s = 0
+      s += scoreText(rel.title || '', providerTokens, resourceTokens, reasons, { provider: 0.25, resource: 0.45 })
+      s += 0.5 * scoreText(rel.summary || '', providerTokens, resourceTokens, reasons, { provider: 0.2, resource: 0.25 })
+      if ((rel as any).categories && (rel as any).categories.some((c: string) => providerTokens.some(pt => c.toLowerCase().includes(pt)))) {
+        s += 0.15
+        reasons.push('provider in categories')
+      }
+      // Region adjustment
+      s = adjustForRegions(Math.min(s, 1), rel, userRegions, reasons)
+      s = Math.min(s, 1)
+      if (s >= threshold) {
+        matches.push({
+          id: rel.id,
+          title: rel.title,
+          link: rel.link,
+          published: rel.published,
+          relevanceScore: s,
+          reasons,
+          categories: (rel as any).categories || []
+        })
+      }
+    }
+
     matches.sort((a, b) => {
       if (b.relevanceScore !== a.relevanceScore) return b.relevanceScore - a.relevanceScore
       const ta = Date.parse(a.published || '') || 0

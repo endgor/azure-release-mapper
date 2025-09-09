@@ -3,13 +3,13 @@ import Header from './components/Header'
 import CsvUploader from './components/CsvUploader'
 import ResultsTable from './components/ResultsTable'
 import { fetchRss } from './lib/rss'
-import { matchReleases } from './lib/match'
+import { matchReleasesRegional } from './lib/match'
 import { aiAugment } from './lib/ai'
-import type { MatchResult } from './lib/types'
+import type { MatchResult, RegionAwareInventory } from './lib/types'
 import { downloadResultsCsv } from './lib/download'
 
 export default function App() {
-  const [resources, setResources] = useState<Map<string, number>>(new Map())
+  const [inventory, setInventory] = useState<RegionAwareInventory>({ byType: new Map(), regions: new Set() })
   const [rssStatus, setRssStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const [releases, setReleases] = useState<any[]>([])
   const [results, setResults] = useState<MatchResult[]>([])
@@ -37,8 +37,8 @@ export default function App() {
   }, [])
 
 
-  async function handleCsvParsed(map: Map<string, number>) {
-    setResources(map)
+  async function handleCsvParsed(inv: RegionAwareInventory) {
+    setInventory(inv)
     
     // Automatically start analysis after showing success state
     if (rssStatus === 'ready') {
@@ -51,7 +51,7 @@ export default function App() {
         // Start the actual analysis
         setTimeout(async () => {
           try {
-            const base = matchReleases(map, releases)
+            const base = matchReleasesRegional(inv, releases)
             const final = await aiAugment(releases, base)
             setResults(final)
             
@@ -151,7 +151,7 @@ export default function App() {
                   </div>
                   <div>
                     <div className="text-sm font-medium text-blue-800">Analysis in progress</div>
-                    <div className="text-xs text-blue-600">Matching {resources.size} resource type{resources.size !== 1 ? 's' : ''} against release notes...</div>
+                    <div className="text-xs text-blue-600">Matching {inventory.byType.size} resource type{inventory.byType.size !== 1 ? 's' : ''} against release notes...</div>
                   </div>
                 </div>
               </div>

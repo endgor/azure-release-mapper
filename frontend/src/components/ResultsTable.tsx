@@ -310,8 +310,7 @@ export default function ResultsTable({ results }: Props) {
             {filteredRows.length} resource type(s) • {totalVisibleMatches} matches found
           </p>
           <div className="text-xs text-slate-500">
-            <span className="font-medium">Relevance Score:</span> Based on keyword matches in release titles, summaries, and categories. 
-            Only releases with 30%+ relevance are shown.
+            <span className="font-medium">Relevance Score:</span> Based on keyword matches in titles, summaries, categories, with region match/mismatch adjustments. Only releases with 30%+ relevance are shown.
           </div>
         </div>
         {/* Filters */}

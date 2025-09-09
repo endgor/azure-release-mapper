@@ -1,9 +1,8 @@
 import { useState, useRef, DragEvent } from 'react'
-import { parseResourceCsv } from '../lib/csv'
+import { parseResourceCsvWithRegions } from '../lib/csv'
+import type { RegionAwareInventory } from '../lib/types'
 
-interface Props {
-  onParsed: (map: Map<string, number>) => void
-}
+interface Props { onParsed: (inventory: RegionAwareInventory) => void }
 
 export default function CsvUploader({ onParsed }: Props) {
   const [fileName, setFileName] = useState('')
@@ -24,12 +23,12 @@ export default function CsvUploader({ onParsed }: Props) {
     setFileName(file.name)
     
     try {
-      const map = await parseResourceCsv(file)
-      if (map.size === 0) {
+      const inv = await parseResourceCsvWithRegions(file)
+      if (inv.byType.size === 0) {
         setError('No resource type values found. Check CSV headers for Azure ("RESOURCE TYPE") or CloudOps ("type"/"sub_type").')
       } else {
-        setUniqueCount(map.size)
-        onParsed(map)
+        setUniqueCount(inv.byType.size)
+        onParsed(inv)
       }
     } catch (e: any) {
       setError(e?.message || 'Failed to parse CSV')

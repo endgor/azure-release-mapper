@@ -26,3 +26,9 @@ export interface MatchResult {
   topImpactSummary?: string
   overallScore: number
 }
+
+// Region-aware inventory for scoring adjustments
+export interface RegionAwareInventory {
+  byType: Map<string, number>
+  regions: Set<string>
+}
