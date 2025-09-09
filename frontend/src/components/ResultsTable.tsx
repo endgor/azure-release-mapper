@@ -273,7 +273,10 @@ export default function ResultsTable({ results }: Props) {
             <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded shadow-lg z-10 p-2">
               <div className="flex items-center justify-between mb-2">
                 <div className="text-xs font-medium text-slate-700">Filter by month</div>
-                <button onClick={() => setOpenMonthDropdown(false)} className="text-xs text-slate-500 hover:text-slate-700">Close</button>
+                <div className="flex items-center gap-2">
+                  <button onClick={selectAllMonths} className="text-xs text-slate-500 hover:text-slate-700">Clear</button>
+                  <button onClick={() => setOpenMonthDropdown(false)} className="text-xs text-slate-500 hover:text-slate-700">Close</button>
+                </div>
               </div>
               <div className="mb-2">
                 <label className="flex items-center gap-2 text-xs cursor-pointer">
@@ -324,7 +327,10 @@ export default function ResultsTable({ results }: Props) {
               <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded shadow-lg z-10 p-2">
                 <div className="flex items-center justify-between mb-2">
                   <div className="text-xs font-medium text-slate-700">Filter by status</div>
-                  <button onClick={() => setOpenStatusDropdown(false)} className="text-xs text-slate-500 hover:text-slate-700">Close</button>
+                  <div className="flex items-center gap-2">
+                    <button onClick={selectAllStatuses} className="text-xs text-slate-500 hover:text-slate-700">Clear</button>
+                    <button onClick={() => setOpenStatusDropdown(false)} className="text-xs text-slate-500 hover:text-slate-700">Close</button>
+                  </div>
                 </div>
                 <div className="mb-2">
                   <label className="flex items-center gap-2 text-xs cursor-pointer">
@@ -378,7 +384,10 @@ export default function ResultsTable({ results }: Props) {
               <div className="absolute right-0 mt-2 w-64 bg-white border border-slate-200 rounded shadow-lg z-10 p-2">
                 <div className="flex items-center justify-between mb-2">
                   <div className="text-xs font-medium text-slate-700">Filter by tag</div>
-                  <button onClick={() => setOpenTagsDropdown(false)} className="text-xs text-slate-500 hover:text-slate-700">Close</button>
+                  <div className="flex items-center gap-2">
+                    <button onClick={selectAllTags} className="text-xs text-slate-500 hover:text-slate-700">Clear</button>
+                    <button onClick={() => setOpenTagsDropdown(false)} className="text-xs text-slate-500 hover:text-slate-700">Close</button>
+                  </div>
                 </div>
                 <div className="mb-2">
                   <label className="flex items-center gap-2 text-xs cursor-pointer">
