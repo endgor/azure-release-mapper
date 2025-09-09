@@ -80,8 +80,7 @@ export default function CsvUploader({ onParsed }: Props) {
       <div className="flex items-start justify-between mb-6">
         <div>
           <h3 className="text-lg font-semibold text-slate-800 mb-2">📊 Resource Inventory</h3>
-          <p className="text-sm text-slate-600 mb-1">Upload Azure "All resources" CSV or CloudOps environment export</p>
-          <p className="text-xs text-slate-500">Azure: NAME, RESOURCE GROUP, LOCATION, SUBSCRIPTION, RESOURCE TYPE • CloudOps: type[, sub_type]</p>
+          <p className="text-sm text-slate-600 mb-1">Export "All resources" CSV from Azure portal (include 'Resource Type' column in the export) or export the CSV file from CloudOps portal, then upload it here.</p>
         </div>
       </div>
 

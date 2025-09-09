@@ -25,6 +25,12 @@ Server
 
 In development, the frontend will call `http://localhost:8787/api/rss` for the RSS feed.
 
+## CSV Inputs
+
+- Export "All resources" CSV from Azure portal (include 'Resource Type' column in the export).
+- Or export the CSV file from CloudOps portal.
+- Upload either CSV in the app; both formats are auto-detected.
+
 ## Build and Deploy (Azure Container Apps)
 
 Container image name: `cloudops-release-mapper`
