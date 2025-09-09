@@ -1,13 +1,28 @@
 # CloudOps Azure Release Mapper
 
-CloudOps Azure Release Mapper helps you map Azure release notes to your existing environment. Upload an Azure Portal "All resources" CSV export or a CloudOps environment CSV export and quickly see which updates relate to your deployed resource types.
+A full-stack web application that helps CloudOps teams map Azure release notes to their existing infrastructure. Simply upload a CSV export of your Azure resources and discover which Azure updates are relevant to your deployed services.
 
-- Upload CSV (Azure or CloudOps), extract unique resource types
-- Fetch Azure release notes RSS via API proxy
-- Match updates to resource types (heuristics + optional local Ollama AI)
-- View results and download as CSV
+## Overview
 
-See PLAN.md for full technical details. This deployment uses Ollama (Phi-3.5 mini) locally inside the container — no API keys or external AI services required.
+This application intelligently matches Azure release announcements to your specific resource types using:
+- **CSV Upload**: Support for both Azure Portal "All resources" exports and CloudOps environment exports
+- **Azure Release Feed**: Real-time Azure release notes via RSS feed
+- **AI-Powered Matching**: Local Ollama AI (Phi-3.5 mini) for intelligent release-to-resource correlation
+- **Export Results**: Download matched results as CSV for reporting and tracking
+
+**Key Benefits:**
+- No external API keys required (uses local AI)
+- Supports both Azure and CloudOps CSV formats
+- Fast, intelligent matching of releases to your infrastructure
+- Self-contained deployment with Docker
+
+## Tech Stack
+
+- **Frontend**: React + TypeScript + Vite + Tailwind CSS
+- **Backend**: Node.js + Express + TypeScript
+- **AI**: Local Ollama (Phi-3.5 mini model)
+- **Deployment**: Docker + Azure Container Apps
+- **CI/CD**: GitHub Actions
 
 ## Quickstart
 
@@ -31,46 +46,53 @@ In development, the frontend will call `http://localhost:8787/api/rss` for the R
 - Or export the CSV file from CloudOps portal.
 - Upload either CSV in the app; both formats are auto-detected.
 
-## Build and Deploy (Azure Container Apps)
+## Deployment
 
-Container image name: `cloudops-release-mapper`
-Container App: `ca-cloudops-release-mapper`
-Resource Group: `rg-cloudops-release-mapper`
-ACR: `acrcloudopsreleasemapper`
-Location: `westeurope`
+### Automated Deployment (GitHub Actions)
+The project includes a complete CI/CD pipeline that automatically builds and deploys to Azure Container Apps on every push to main:
 
-1) Build and push image to ACR
-- `docker build -t acrcloudopsreleasemapper.azurecr.io/cloudops-release-mapper:latest .`
-- `az acr login --name acrcloudopsreleasemapper`
-- `docker push acrcloudopsreleasemapper.azurecr.io/cloudops-release-mapper:latest`
+1. **Setup Azure Authentication** (one-time):
+   - Create Azure App Registration with federated identity for GitHub
+   - Add these secrets to your GitHub repository:
+     - `AZURE_CLIENT_ID`
+     - `AZURE_TENANT_ID` 
+     - `AZURE_SUBSCRIPTION_ID`
 
-2) Option A — Build in Bicep with ACR Build
-- Ensure your repo is publicly accessible or provide a URL including a token.
-- Edit `infra/main.bicepparam` and set:
-  - `doBuild = true`
-  - `sourceRepoUrl = 'https://github.com/<org>/<repo>.git#<branch>'`
-- Deploy infra (subscription scope). This will create RG + ACR, build and push the image in ACR, then create the Container App referencing that image:
-  - `az deployment sub create -l westeurope -f infra/main.bicep -p infra/main.bicepparam`
+2. **Push to main branch** - GitHub Actions will automatically:
+   - Build the Docker image
+   - Push to Azure Container Registry
+   - Deploy to Azure Container Apps
+   - Create semantic version tags
 
-3) Option B — Manual build then deploy
-- Create RG and ACR first:
-  - `az group create -n rg-cloudops-release-mapper -l westeurope`
-  - `az acr create -n acrcloudopsreleasemapper -g rg-cloudops-release-mapper --sku Basic`
-- Build and push the image (two choices):
-  - Using ACR Build from this directory:
-    - `az acr build -r acrcloudopsreleasemapper -t acrcloudopsreleasemapper.azurecr.io/cloudops-release-mapper:latest .`
-  - Or local Docker then push:
-    - `docker build -t cloudops-release-mapper:latest .`
-    - `docker tag cloudops-release-mapper:latest acrcloudopsreleasemapper.azurecr.io/cloudops-release-mapper:latest`
-    - `az acr login --name acrcloudopsreleasemapper`
-    - `docker push acrcloudopsreleasemapper.azurecr.io/cloudops-release-mapper:latest`
-- Deploy infra (subscription scope), referencing the pushed tag:
-  - `az deployment sub create -l westeurope -f infra/main.bicep -p infra/main.bicepparam -p containerImageTag=latest`
+### Manual Deployment Options
 
-3) Open the Container App URL output in the portal or via CLI
+**Azure Resources:**
+- Resource Group: `rg-cloudops-release-mapper`
+- Container App: `ca-cloudops-release-mapper`  
+- ACR: `acrcloudopsreleasemapper`
+- Location: `westeurope`
 
-Notes
-- The container runs the Node API and a local Ollama server (Phi-3.5 mini) in one process using `start.sh`.
-- The frontend is served statically by the Node API; AI calls are sent to `/api/ai/analyze` which proxies to `127.0.0.1:11434`.
-- No cloud AI services or API keys are used.
-- If your region supports up to 4 vCPU / 8 GiB on Consumption, the Bicep selects the Consumption workload profile and requests 4/8. If deployment fails due to limits, reduce to 2 vCPU / 4 GiB in `infra/containerapp.bicep` or switch to a Dedicated profile.
+#### Option A: Bicep Infrastructure-as-Code
+```bash
+# Deploy complete infrastructure with build
+az deployment sub create -l westeurope -f infra/main.bicep -p infra/main.bicepparam
+```
+
+#### Option B: Manual ACR Build & Push
+```bash
+# Create resources
+az group create -n rg-cloudops-release-mapper -l westeurope
+az acr create -n acrcloudopsreleasemapper -g rg-cloudops-release-mapper --sku Basic
+
+# Build and push
+az acr build -r acrcloudopsreleasemapper -t acrcloudopsreleasemapper.azurecr.io/cloudops-release-mapper:latest .
+
+# Deploy infrastructure
+az deployment sub create -l westeurope -f infra/main.bicep -p infra/main.bicepparam
+```
+
+### Architecture Notes
+- Single container runs Node.js API + local Ollama AI server
+- Frontend served statically by the API
+- No external API keys or cloud AI services required
+- Supports 2-4 vCPU / 4-8 GiB depending on region limits
