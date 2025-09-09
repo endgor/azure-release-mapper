@@ -7,6 +7,7 @@ interface Props {
 
 function getTagClasses(tag: string): string {
   const t = tag.toLowerCase()
+  // Status-like tags (strong semantics)
   if (/(launched|generally available|general availability|\bga\b)/.test(t)) {
     return 'bg-green-100 text-green-800 border border-green-200'
   }
@@ -22,14 +23,54 @@ function getTagClasses(tag: string): string {
   if (/(security|vulnerability|cve)/.test(t)) {
     return 'bg-red-100 text-red-800 border border-red-200'
   }
+  // Change-type hints
   if (/(update|improvement|enhancement|enhanced|improved)/.test(t)) {
     return 'bg-blue-100 text-blue-800 border border-blue-200'
   }
   if (/(bug|fix|resolved)/.test(t)) {
     return 'bg-teal-100 text-teal-800 border border-teal-200'
   }
-  // Default/product tags
-  return 'bg-indigo-100 text-indigo-700 border border-indigo-200'
+
+  // Soft product family coloring (limited palette – avoids rainbow). Softer text at 700.
+  if (/(compute|virtual machine|virtual machines|vm scale|vmss|compute gallery|proximity placement)/.test(t)) {
+    return 'bg-sky-100 text-sky-700 border border-sky-200'
+  }
+  if (/(container|kubernetes|aks|acr|helm|k8s)/.test(t)) {
+    return 'bg-cyan-100 text-cyan-700 border border-cyan-200'
+  }
+  // Networking, broadened to private endpoints and connectivity
+  if (/(network|vnet|virtual network|dns|cdn|front door|firewall|load balancer|application gateway|traffic manager|private link|private endpoint|express ?route|expressroute|vpn|vwan|virtual wan|nsg|route table|peering|bastion)/.test(t)) {
+    return 'bg-indigo-100 text-indigo-700 border border-indigo-200'
+  }
+  if (/(storage|backup|blob|disk|disks|files|file share|data ?lake|netapp)/.test(t)) {
+    return 'bg-violet-100 text-violet-700 border border-violet-200'
+  }
+  if (/(database|sql|cosmos|postgres|postgresql|mysql|mariadb|redis|cache)/.test(t)) {
+    return 'bg-teal-100 text-teal-700 border border-teal-200'
+  }
+
+  // AI & Machine Learning (group together)
+  if (/(\bai\b|azure ai|ai foundry|ai studio|machine learning|azure machine learning|\baml\b|mlops|cognitive services|vision|speech|language|openai)/.test(t)) {
+    return 'bg-fuchsia-100 text-fuchsia-700 border border-fuchsia-200'
+  }
+
+  // Identity & access (Entra, AAD, RBAC, managed identity, Key Vault)
+  if (/(entra|azure active directory|\baad\b|managed identity|service principal|rbac|role[- ]based access|key vault)/.test(t)) {
+    return 'bg-purple-100 text-purple-700 border border-purple-200'
+  }
+
+  // Monitoring & observability (Monitor, Log Analytics, App Insights, metrics/alerts)
+  if (/(azure monitor|monitoring|log analytics|application insights|app insights|insights|metrics|alerts?|diagnostic settings|grafana|prometheus)/.test(t)) {
+    return 'bg-lime-100 text-lime-700 border border-lime-200'
+  }
+
+  // Governance & management (Policy, Blueprints, Cost, Advisor, Resource Graph, Purview)
+  if (/(policy|blueprint|blueprints|cost management|advisor|resource graph|purview|management and governance)/.test(t)) {
+    return 'bg-stone-100 text-stone-700 border border-stone-200'
+  }
+
+  // Default/product tags → neutral gray
+  return 'bg-slate-100 text-slate-700 border border-slate-200'
 }
 
 function ScoreBar({ score }: { score: number }) {
