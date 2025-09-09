@@ -205,13 +205,23 @@ export default function ResultsTable({ results }: Props) {
     })
   }
 
-  const totalVisibleMatches = useMemo(() => {
-    return sortedResults.reduce((sum, r) => sum + filterReleases(r.matchedReleases).length, 0)
-  }, [sortedResults, selectedMonths, selectedStatuses, selectedTags])
+  const filteredRows = useMemo(() => {
+    const rows = results.map(r => {
+      const filteredReleases = filterReleases(r.matchedReleases)
+      const filteredScore = filteredReleases.length
+        ? Math.max(...filteredReleases.map(m => Math.max(m.relevanceScore, m.aiConfidence ?? 0)))
+        : 0
+      return { result: r, filteredReleases, filteredScore }
+    }).filter(x => x.filteredReleases.length > 0)
 
-  const visibleResults = useMemo(() => {
-    return sortedResults.filter(r => filterReleases(r.matchedReleases).length > 0)
-  }, [sortedResults, selectedMonths, selectedStatuses, selectedTags])
+    // Sort by filtered score desc, then by resource count desc as tiebreaker
+    rows.sort((a, b) => (b.filteredScore - a.filteredScore) || (b.result.resourceCount - a.result.resourceCount))
+    return rows
+  }, [results, selectedMonths, selectedStatuses, selectedTags])
+
+  const totalVisibleMatches = useMemo(() => {
+    return filteredRows.reduce((sum, r) => sum + r.filteredReleases.length, 0)
+  }, [filteredRows])
 
   return (
     <div className="card-elevated p-4 animate-fade-in">
@@ -219,7 +229,7 @@ export default function ResultsTable({ results }: Props) {
         <div>
           <h2 className="text-xl font-bold text-slate-800 mb-1">📋 Analysis Results</h2>
           <p className="text-xs text-slate-600 mb-2">
-            {visibleResults.length} resource type(s) • {totalVisibleMatches} matches found
+            {filteredRows.length} resource type(s) • {totalVisibleMatches} matches found
           </p>
           <div className="text-xs text-slate-500">
             <span className="font-medium">Relevance Score:</span> Based on keyword matches in release titles, summaries, and categories. 
@@ -387,16 +397,14 @@ export default function ResultsTable({ results }: Props) {
       </div>
 
       <div className="space-y-2">
-        {visibleResults.length === 0 && (
+        {filteredRows.length === 0 && (
           <div className="text-xs text-slate-500 p-3 border border-slate-200 rounded bg-slate-50">
             No results match the current filters.
           </div>
         )}
-        {visibleResults.map((result, index) => {
+        {filteredRows.map(({ result, filteredReleases, filteredScore }, index) => {
           const isExpanded = expanded[result.resourceType]
-          const filteredReleases = filterReleases(result.matchedReleases)
           const hasMatches = filteredReleases.length > 0
-          const filteredScore = hasMatches ? Math.max(...filteredReleases.map(m => Math.max(m.relevanceScore, m.aiConfidence ?? 0))) : 0
           const impactLevel = filteredScore >= 0.7 ? 'high' : filteredScore >= 0.5 ? 'medium' : filteredScore > 0 ? 'low' : null
 
           return (
