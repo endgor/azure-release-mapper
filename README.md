@@ -1,8 +1,8 @@
 # CloudOps Azure Release Mapper
 
-CloudOps Azure Release Mapper helps you map Azure release notes to your existing environment. Upload an Azure Portal "All resources" CSV export and quickly see which updates relate to your deployed resource types.
+CloudOps Azure Release Mapper helps you map Azure release notes to your existing environment. Upload an Azure Portal "All resources" CSV export or a CloudOps environment CSV export and quickly see which updates relate to your deployed resource types.
 
-- Upload CSV, extract unique resource types
+- Upload CSV (Azure or CloudOps), extract unique resource types
 - Fetch Azure release notes RSS via API proxy
 - Match updates to resource types (heuristics + optional local Ollama AI)
 - View results and download as CSV

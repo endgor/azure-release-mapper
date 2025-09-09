@@ -1,5 +1,5 @@
 import { useState, useRef, DragEvent } from 'react'
-import { parseAzureCsv } from '../lib/csv'
+import { parseResourceCsv } from '../lib/csv'
 
 interface Props {
   onParsed: (map: Map<string, number>) => void
@@ -24,9 +24,9 @@ export default function CsvUploader({ onParsed }: Props) {
     setFileName(file.name)
     
     try {
-      const map = await parseAzureCsv(file)
+      const map = await parseResourceCsv(file)
       if (map.size === 0) {
-        setError('No RESOURCE TYPE values found. Check CSV columns.')
+        setError('No resource type values found. Check CSV headers for Azure ("RESOURCE TYPE") or CloudOps ("type"/"sub_type").')
       } else {
         setUniqueCount(map.size)
         onParsed(map)
@@ -79,9 +79,9 @@ export default function CsvUploader({ onParsed }: Props) {
     <div className="card-elevated p-6 animate-fade-in">
       <div className="flex items-start justify-between mb-6">
         <div>
-          <h3 className="text-lg font-semibold text-slate-800 mb-2">📊 Azure Resource Inventory</h3>
-          <p className="text-sm text-slate-600 mb-1">Upload your Azure "All resources" CSV export</p>
-          <p className="text-xs text-slate-500">Required columns: NAME, RESOURCE GROUP, LOCATION, SUBSCRIPTION, RESOURCE TYPE, TYPE</p>
+          <h3 className="text-lg font-semibold text-slate-800 mb-2">📊 Resource Inventory</h3>
+          <p className="text-sm text-slate-600 mb-1">Upload Azure "All resources" CSV or CloudOps environment export</p>
+          <p className="text-xs text-slate-500">Azure: NAME, RESOURCE GROUP, LOCATION, SUBSCRIPTION, RESOURCE TYPE • CloudOps: type[, sub_type]</p>
         </div>
       </div>
 
@@ -140,7 +140,7 @@ export default function CsvUploader({ onParsed }: Props) {
           ) : isProcessing ? (
             <div className="text-center">
               <div className="text-lg font-semibold text-blue-700">Processing CSV...</div>
-              <div className="text-sm text-slate-500">Analyzing your Azure resources</div>
+              <div className="text-sm text-slate-500">Analyzing your resources</div>
             </div>
           ) : error ? (
             <div className="text-center">
@@ -166,4 +166,3 @@ export default function CsvUploader({ onParsed }: Props) {
     </div>
   )
 }
-
