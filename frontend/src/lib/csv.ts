@@ -130,7 +130,8 @@ function normalizeRegion(v?: string): string {
 function getRegionField(row: any): string {
   // Try common headers for Azure exports and CloudOps
   const candidates = [
-    'Location', 'location', 'Region', 'region', 'azure_region', 'Azure Region', 'geo', 'Geography'
+    'Location', 'location', 'Region', 'region', 'azure_region', 'Azure Region', 'geo', 'Geography',
+    'entity_region', 'Entity Region', 'region_name', 'Region Name'
   ]
   for (const k of candidates) {
     if (row?.[k] != null && row[k] !== '') return normalizeRegion(String(row[k]))
