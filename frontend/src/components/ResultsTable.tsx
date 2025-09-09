@@ -141,6 +141,8 @@ export default function ResultsTable({ results }: Props) {
   const [selectedStatuses, setSelectedStatuses] = useState<Array<'launched' | 'preview'>>([])
   // Selected category tags. Empty = All tags
   const [selectedTags, setSelectedTags] = useState<string[]>([])
+  // Search within tags dropdown
+  const [tagSearch, setTagSearch] = useState('')
 
   const monthNames = useMemo(
     () => [
@@ -198,6 +200,21 @@ export default function ResultsTable({ results }: Props) {
     return Array.from(set).sort((a, b) => a.localeCompare(b))
   }, [results])
 
+  // Filter and order tags for the dropdown: match search and show selected first
+  const filteredTags = useMemo(() => {
+    const q = tagSearch.trim().toLowerCase()
+    let list = availableTags
+    if (q) list = availableTags.filter(t => t.toLowerCase().includes(q))
+    // Do not mutate original; sort selected to the top
+    return [...list].sort((a, b) => {
+      const aSel = selectedTags.includes(a)
+      const bSel = selectedTags.includes(b)
+      if (aSel && !bSel) return -1
+      if (!aSel && bSel) return 1
+      return a.localeCompare(b)
+    })
+  }, [availableTags, tagSearch, selectedTags])
+
   const toggleTag = (tag: string) => {
     setSelectedTags(prev => {
       const has = prev.includes(tag)
@@ -218,6 +235,11 @@ export default function ResultsTable({ results }: Props) {
     document.addEventListener('mousedown', onDocMouseDown)
     return () => document.removeEventListener('mousedown', onDocMouseDown)
   }, [openMonthDropdown, openStatusDropdown, openTagsDropdown])
+
+  // Clear tag search when closing the dropdown
+  useEffect(() => {
+    if (!openTagsDropdown) setTagSearch('')
+  }, [openTagsDropdown])
 
   if (!results.length) return null
 
@@ -422,13 +444,23 @@ export default function ResultsTable({ results }: Props) {
             </button>
 
             {openTagsDropdown && (
-              <div className="absolute right-0 mt-2 w-64 bg-white border border-slate-200 rounded shadow-lg z-10 p-2">
+              <div className="absolute right-0 mt-2 w-72 bg-white border border-slate-200 rounded shadow-lg z-10 p-2">
                 <div className="flex items-center justify-between mb-2">
                   <div className="text-xs font-medium text-slate-700">Filter by tag</div>
                   <div className="flex items-center gap-2">
                     <button onClick={selectAllTags} className="text-xs text-slate-500 hover:text-slate-700">Clear</button>
                     <button onClick={() => setOpenTagsDropdown(false)} className="text-xs text-slate-500 hover:text-slate-700">Close</button>
                   </div>
+                </div>
+                {/* Search within tags */}
+                <div className="mb-2">
+                  <input
+                    type="text"
+                    value={tagSearch}
+                    onChange={e => setTagSearch(e.target.value)}
+                    placeholder="Search tags..."
+                    className="w-full px-2 py-1 text-xs border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-300"
+                  />
                 </div>
                 <div className="mb-2">
                   <label className="flex items-center gap-2 text-xs cursor-pointer">
@@ -440,11 +472,11 @@ export default function ResultsTable({ results }: Props) {
                     <span>All</span>
                   </label>
                 </div>
-                <div className="max-h-48 overflow-auto pr-1">
-                  {availableTags.length === 0 && (
-                    <div className="text-xs text-slate-500">No tags available</div>
+                <div className="max-h-60 overflow-auto pr-1">
+                  {filteredTags.length === 0 && (
+                    <div className="text-xs text-slate-500">{tagSearch ? 'No matching tags' : 'No tags available'}</div>
                   )}
-                  {availableTags.map((t) => (
+                  {filteredTags.map((t) => (
                     <label key={t} className="flex items-center gap-2 py-0.5 text-xs cursor-pointer">
                       <input
                         type="checkbox"
