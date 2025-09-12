@@ -143,6 +143,8 @@ export default function ResultsTable({ results }: Props) {
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   // Search within tags dropdown
   const [tagSearch, setTagSearch] = useState('')
+  // Entra filter checkbox
+  const [showEntraOnly, setShowEntraOnly] = useState(false)
 
   const monthNames = useMemo(
     () => [
@@ -245,6 +247,37 @@ export default function ResultsTable({ results }: Props) {
 
   const sortedResults = [...results].sort((a, b) => b.overallScore - a.overallScore)
 
+  // Helper to check if a release is Entra-related
+  const isEntraRelated = (item: MatchResult['matchedReleases'][0]) => {
+    const text = `${item.title} ${(item.categories || []).join(' ')}`.toLowerCase()
+    
+    // Check for explicit Microsoft Entra mentions
+    if (text.includes('microsoft entra') || text.includes('entra id')) {
+      return true
+    }
+    
+    // Check for Entra-related categories
+    const categories = (item.categories || []).map(c => c.toLowerCase())
+    if (categories.includes('identity') || categories.includes('microsoft entra domain services')) {
+      return true
+    }
+    
+    // Check for identity and authentication keywords
+    const entraKeywords = [
+      'azure active directory', 'azure ad', 'aad',
+      'identity management', 'identity provider', 'identity platform',
+      'authentication', 'authorization', 'single sign-on', 'sso',
+      'conditional access', 'privileged identity', 'pim',
+      'multi-factor authentication', 'mfa', 'active directory',
+      'managed identity', 'service principal', 'rbac',
+      'application proxy', 'b2c', 'external id',
+      'directory services', 'domain services', 'ldap',
+      'kerberos authentication', 'saml', 'oauth', 'openid connect'
+    ]
+    
+    return entraKeywords.some(keyword => text.includes(keyword))
+  }
+
   // Helper to filter a list of releases based on selected filters
   const filterReleases = (items: MatchResult['matchedReleases']) => {
     const launchedRegex = /(launched|generally available|general availability|\bga\b)/i
@@ -279,6 +312,11 @@ export default function ResultsTable({ results }: Props) {
         if (!anyTag) return false
       }
 
+      // Entra filter
+      if (showEntraOnly && !isEntraRelated(m)) {
+        return false
+      }
+
       return true
     })
   }
@@ -295,7 +333,7 @@ export default function ResultsTable({ results }: Props) {
     // Sort by filtered score desc, then by resource count desc as tiebreaker
     rows.sort((a, b) => (b.filteredScore - a.filteredScore) || (b.result.resourceCount - a.result.resourceCount))
     return rows
-  }, [results, selectedMonths, selectedStatuses, selectedTags])
+  }, [results, selectedMonths, selectedStatuses, selectedTags, showEntraOnly])
 
   const totalVisibleMatches = useMemo(() => {
     return filteredRows.reduce((sum, r) => sum + r.filteredReleases.length, 0)
@@ -488,6 +526,22 @@ export default function ResultsTable({ results }: Props) {
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Entra filter checkbox */}
+          <div className="flex items-center">
+            <label className="flex items-center gap-2 px-3 py-1.5 text-xs rounded border border-slate-300 bg-white hover:bg-slate-50 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={showEntraOnly}
+                onChange={(e) => setShowEntraOnly(e.target.checked)}
+                className="w-3 h-3"
+              />
+              <svg className="w-3 h-3 text-slate-600" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>Entra only</span>
+            </label>
           </div>
         </div>
       </div>
