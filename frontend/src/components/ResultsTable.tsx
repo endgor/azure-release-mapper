@@ -135,8 +135,8 @@ export default function ResultsTable({ results }: Props) {
   const monthRef = useRef<HTMLDivElement | null>(null)
   const statusRef = useRef<HTMLDivElement | null>(null)
   const tagsRef = useRef<HTMLDivElement | null>(null)
-  // Selected months as numbers 1-12. Empty = All months
-  const [selectedMonths, setSelectedMonths] = useState<number[]>([])
+  // Selected year-month combinations as strings (e.g., '2024-11'). Empty = All months
+  const [selectedMonths, setSelectedMonths] = useState<string[]>([])
   // Selected statuses. Empty = All statuses
   const [selectedStatuses, setSelectedStatuses] = useState<Array<'launched' | 'preview'>>([])
   // Selected category tags. Empty = All tags
@@ -145,6 +145,10 @@ export default function ResultsTable({ results }: Props) {
   const [tagSearch, setTagSearch] = useState('')
   // Entra filter checkbox
   const [showEntraOnly, setShowEntraOnly] = useState(false)
+  // Relevance score threshold filter
+  const [minScore, setMinScore] = useState(30)
+  const [openScoreDropdown, setOpenScoreDropdown] = useState(false)
+  const scoreRef = useRef<HTMLDivElement | null>(null)
 
   const monthNames = useMemo(
     () => [
@@ -154,19 +158,27 @@ export default function ResultsTable({ results }: Props) {
     []
   )
 
-  // Collect available months from all matched releases
+  // Helper function to format year-month string for display
+  const formatYearMonth = (yearMonth: string) => {
+    const [year, month] = yearMonth.split('-')
+    const monthIndex = parseInt(month, 10) - 1
+    return `${monthNames[monthIndex]} (${year})`
+  }
+
+  // Collect available year-month combinations from all matched releases
   const availableMonths = useMemo(() => {
-    const set = new Set<number>()
+    const yearMonthSet = new Set<string>()
     for (const r of results) {
       for (const m of r.matchedReleases) {
         const d = new Date(m.published)
         if (!isNaN(d.getTime())) {
-          set.add(d.getMonth() + 1)
+          const yearMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+          yearMonthSet.add(yearMonth)
         }
       }
     }
-    // Sort by most recent month first (relative to calendar order 12..1)
-    return Array.from(set).sort((a, b) => b - a)
+    // Sort by most recent first (2025-11, 2025-10, 2024-12, etc.)
+    return Array.from(yearMonthSet).sort((a, b) => b.localeCompare(a))
   }, [results])
 
   const isAllMonths = selectedMonths.length === 0
@@ -233,10 +245,11 @@ export default function ResultsTable({ results }: Props) {
       if (openMonthDropdown && monthRef.current && !monthRef.current.contains(t)) setOpenMonthDropdown(false)
       if (openStatusDropdown && statusRef.current && !statusRef.current.contains(t)) setOpenStatusDropdown(false)
       if (openTagsDropdown && tagsRef.current && !tagsRef.current.contains(t)) setOpenTagsDropdown(false)
+      if (openScoreDropdown && scoreRef.current && !scoreRef.current.contains(t)) setOpenScoreDropdown(false)
     }
     document.addEventListener('mousedown', onDocMouseDown)
     return () => document.removeEventListener('mousedown', onDocMouseDown)
-  }, [openMonthDropdown, openStatusDropdown, openTagsDropdown])
+  }, [openMonthDropdown, openStatusDropdown, openTagsDropdown, openScoreDropdown])
 
   // Clear tag search when closing the dropdown
   useEffect(() => {
@@ -288,8 +301,8 @@ export default function ResultsTable({ results }: Props) {
       if (!isAllMonths) {
         const d = new Date(m.published)
         if (isNaN(d.getTime())) return false
-        const month = d.getMonth() + 1
-        if (!selectedMonths.includes(month)) return false
+        const yearMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+        if (!selectedMonths.includes(yearMonth)) return false
       }
 
       // Status filter
@@ -317,6 +330,12 @@ export default function ResultsTable({ results }: Props) {
         return false
       }
 
+      // Score threshold filter
+      const maxScore = Math.max(m.relevanceScore, m.aiConfidence || 0)
+      if (maxScore * 100 < minScore) {
+        return false
+      }
+
       return true
     })
   }
@@ -333,7 +352,7 @@ export default function ResultsTable({ results }: Props) {
     // Sort by filtered score desc, then by resource count desc as tiebreaker
     rows.sort((a, b) => (b.filteredScore - a.filteredScore) || (b.result.resourceCount - a.result.resourceCount))
     return rows
-  }, [results, selectedMonths, selectedStatuses, selectedTags, showEntraOnly])
+  }, [results, selectedMonths, selectedStatuses, selectedTags, showEntraOnly, minScore])
 
   const totalVisibleMatches = useMemo(() => {
     return filteredRows.reduce((sum, r) => sum + r.filteredReleases.length, 0)
@@ -358,7 +377,7 @@ export default function ResultsTable({ results }: Props) {
           <button
             type="button"
             onClick={() => setOpenMonthDropdown(o => !o)}
-            className="inline-flex items-center gap-2 px-3 py-1.5 text-xs rounded border border-slate-300 bg-white hover:bg-slate-50"
+            className="inline-flex items-center gap-2 px-3 py-1.5 text-xs rounded border border-slate-300 bg-white hover:bg-slate-50 whitespace-nowrap"
           >
             <svg className="w-3 h-3 text-slate-600" viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3M3 11h18M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2h-1M5 5H4a2 2 0 00-2 2v10a2 2 0 002 2" />
@@ -392,14 +411,14 @@ export default function ResultsTable({ results }: Props) {
                 {availableMonths.length === 0 && (
                   <div className="text-xs text-slate-500">No months available</div>
                 )}
-                {availableMonths.map((m) => (
-                  <label key={m} className="flex items-center gap-2 py-0.5 text-xs cursor-pointer">
+                {availableMonths.map((yearMonth) => (
+                  <label key={yearMonth} className="flex items-center gap-2 py-0.5 text-xs cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={selectedMonths.includes(m)}
-                      onChange={() => toggleMonth(m)}
+                      checked={selectedMonths.includes(yearMonth)}
+                      onChange={() => toggleMonth(yearMonth)}
                     />
-                    <span>{monthNames[m - 1]}</span>
+                    <span>{formatYearMonth(yearMonth)}</span>
                   </label>
                 ))}
               </div>
@@ -412,7 +431,7 @@ export default function ResultsTable({ results }: Props) {
             <button
               type="button"
               onClick={() => setOpenStatusDropdown(o => !o)}
-              className="inline-flex items-center gap-2 px-3 py-1.5 text-xs rounded border border-slate-300 bg-white hover:bg-slate-50"
+              className="inline-flex items-center gap-2 px-3 py-1.5 text-xs rounded border border-slate-300 bg-white hover:bg-slate-50 whitespace-nowrap"
             >
               <svg className="w-3 h-3 text-slate-600" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 12h14M5 6h14M5 18h14" />
@@ -469,7 +488,7 @@ export default function ResultsTable({ results }: Props) {
             <button
               type="button"
               onClick={() => setOpenTagsDropdown(o => !o)}
-              className="inline-flex items-center gap-2 px-3 py-1.5 text-xs rounded border border-slate-300 bg-white hover:bg-slate-50"
+              className="inline-flex items-center gap-2 px-3 py-1.5 text-xs rounded border border-slate-300 bg-white hover:bg-slate-50 whitespace-nowrap"
             >
               <svg className="w-3 h-3 text-slate-600" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 7l10 10M7 17L17 7" />
@@ -528,9 +547,61 @@ export default function ResultsTable({ results }: Props) {
             )}
           </div>
 
+          {/* Score threshold filter */}
+          <div className="relative" ref={scoreRef}>
+            <button
+              type="button"
+              onClick={() => setOpenScoreDropdown(o => !o)}
+              className="inline-flex items-center gap-2 px-3 py-1.5 text-xs rounded border border-slate-300 bg-white hover:bg-slate-50 whitespace-nowrap"
+            >
+              <svg className="w-3 h-3 text-slate-600" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              {minScore}% min
+              <svg className={`w-3 h-3 transform ${openScoreDropdown ? 'rotate-180' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            {openScoreDropdown && (
+              <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded shadow-lg z-10 p-3">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="text-xs font-medium text-slate-700">Minimum relevance score</div>
+                  <button onClick={() => setOpenScoreDropdown(false)} className="text-xs text-slate-500 hover:text-slate-700">Close</button>
+                </div>
+                <div className="space-y-2">
+                  <div className="text-xs text-slate-600 mb-2">Show only highly relevant releases (default 50%):</div>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="range"
+                      min="10"
+                      max="90"
+                      step="5"
+                      value={minScore}
+                      onChange={(e) => setMinScore(Number(e.target.value))}
+                      className="flex-1 h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer"
+                    />
+                    <div className="text-xs font-mono text-slate-700 min-w-10">{minScore}%</div>
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-slate-500">
+                    <span>10% (show more)</span>
+                    <span>90% (strict)</span>
+                  </div>
+                  <div className="mt-2 pt-2 border-t border-slate-200">
+                    <div className="grid grid-cols-3 gap-1 text-xs">
+                      <button onClick={() => setMinScore(20)} className={`px-2 py-1 rounded ${minScore === 20 ? 'bg-blue-100 text-blue-700' : 'hover:bg-slate-50'}`}>20%</button>
+                      <button onClick={() => setMinScore(30)} className={`px-2 py-1 rounded ${minScore === 30 ? 'bg-blue-100 text-blue-700' : 'hover:bg-slate-50'}`}>30%</button>
+                      <button onClick={() => setMinScore(50)} className={`px-2 py-1 rounded ${minScore === 50 ? 'bg-blue-100 text-blue-700' : 'hover:bg-slate-50'}`}>50%</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Entra filter checkbox */}
           <div className="flex items-center">
-            <label className="flex items-center gap-2 px-3 py-1.5 text-xs rounded border border-slate-300 bg-white hover:bg-slate-50 cursor-pointer">
+            <label className="flex items-center gap-2 px-3 py-1.5 text-xs rounded border border-slate-300 bg-white hover:bg-slate-50 cursor-pointer whitespace-nowrap">
               <input
                 type="checkbox"
                 checked={showEntraOnly}

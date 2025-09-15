@@ -31,17 +31,13 @@ app.post('/api/ai/analyze', async (req, res) => {
   }
 })
 
-// Static hosting for frontend build
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const publicDir = path.join(__dirname, 'public')
 app.use(express.static(publicDir))
 app.get('*', (req, res) => {
-  // SPA fallback
   res.sendFile(path.join(publicDir, 'index.html'))
 })
 
 const port = process.env.PORT ? Number(process.env.PORT) : 8787
-app.listen(port, () => {
-  console.log(`Server listening on http://localhost:${port}`)
-})
+app.listen(port)

@@ -2,10 +2,68 @@ import Fuse from 'fuse.js'
 import type { ReleaseItem, MatchRelease, MatchResult, RegionAwareInventory } from './types'
 
 function splitResourceType(rt: string) {
-  // Format: Microsoft.Provider/resourceName[/child]
   const [provider, ...rest] = rt.split('/')
   const resource = rest.join('/')
   return { provider, resource }
+}
+
+const AZURE_SYNONYMS: Record<string, string[]> = {
+  // Identity and Access
+  'azure ad': ['entra id', 'microsoft entra', 'azure active directory', 'active directory'],
+  'entra id': ['azure ad', 'microsoft entra', 'azure active directory', 'active directory'],
+
+  // Networking
+  'app gateway': ['application gateway', 'appgw'],
+  'application gateway': ['app gateway', 'appgw'],
+
+  // Storage and Data
+  'key vault': ['azure key vault', 'keyvault'],
+  'cosmos db': ['cosmosdb', 'azure cosmos', 'cosmos database'],
+  'data explorer': ['kusto', 'azure data explorer'],
+  'kusto': ['data explorer', 'azure data explorer'],
+
+  // Compute (be more specific to avoid overly broad matches)
+  'virtual machines': ['vms', 'vm', 'azure vm'],
+  'vm': ['virtual machines', 'vms', 'azure vm'],
+  'disks': ['disk storage', 'azure disk', 'managed disks', 'premium ssd', 'ultra disk'],
+  'disk storage': ['disks', 'azure disk', 'managed disks'],
+
+  // Containers
+  'kubernetes service': ['aks', 'azure kubernetes'],
+  'aks': ['kubernetes service', 'azure kubernetes'],
+  'container registry': ['acr', 'azure container registry'],
+  'acr': ['container registry', 'azure container registry'],
+
+  // AI/ML
+  'cognitive services': ['ai services', 'azure ai'],
+  'ai services': ['cognitive services', 'azure ai'],
+
+  // Monitoring
+  'monitor': ['azure monitor', 'monitoring'],
+  'log analytics': ['logs', 'azure logs'],
+
+  // Web
+  'app service': ['web apps', 'azure app service', 'webapp'],
+  'web apps': ['app service', 'azure app service', 'webapp'],
+
+  // Security
+  'security center': ['defender', 'azure defender', 'microsoft defender'],
+  'defender': ['security center', 'azure defender', 'microsoft defender']
+}
+
+const GENERIC_TOKENS = ['compute', 'storage', 'networking', 'security', 'management', 'analytics', 'integration']
+
+function expandWithSynonyms(tokens: string[]): string[] {
+  const expanded = [...tokens]
+
+  for (const token of tokens) {
+    const synonyms = AZURE_SYNONYMS[token.toLowerCase()]
+    if (synonyms) {
+      expanded.push(...synonyms)
+    }
+  }
+
+  return Array.from(new Set(expanded.filter(Boolean)))
 }
 
 function toWords(s: string) {
@@ -24,20 +82,17 @@ function tokensFromResource(resource: string): string[] {
     const joined = words.join(' ')
     const compact = words.join('')
     base.push(joined, compact)
-    // bi-grams
     for (let i = 0; i < words.length - 1; i++) {
       base.push(`${words[i]} ${words[i + 1]}`)
     }
-    // singular/plural tweak for trailing 's'
     const last = words[words.length - 1]
     if (last.endsWith('s')) {
       const singular = last.replace(/s+$/, '')
       base.push([...words.slice(0, -1), singular].join(' '))
     }
-    // Azure-friendly
     base.push('azure ' + joined)
   }
-  return Array.from(new Set(base.filter(Boolean)))
+  return expandWithSynonyms(Array.from(new Set(base.filter(Boolean))))
 }
 
 function tokensFromProvider(provider: string, resourceWords: string[]): string[] {
@@ -55,38 +110,166 @@ function tokensFromProvider(provider: string, resourceWords: string[]): string[]
     t.push(`azure ${shortWords} ${resJoined}`.trim())
     t.push(`azure ${resJoined}`.trim())
   }
-  return Array.from(new Set(t.filter(Boolean)))
+  return expandWithSynonyms(Array.from(new Set(t.filter(Boolean))))
+}
+
+function hasCriticalKeywords(text: string): boolean {
+  const lowerText = text.toLowerCase()
+  const criticalKeywords = [
+    'breaking change', 'retirement', 'deprecation', 'deprecated', 'breaking',
+    'generally available', 'general availability', ' ga ', 'ga:',
+    'security', 'vulnerability'
+  ]
+  return criticalKeywords.some(keyword => lowerText.includes(keyword))
+}
+
+function applyRecencyBoost(publishedDate: string | undefined, text: string, reasons: string[]): number {
+  if (!publishedDate) return 0
+
+  const publishedTime = Date.parse(publishedDate)
+  if (!publishedTime) return 0
+
+  const daysSincePublished = (Date.now() - publishedTime) / (1000 * 60 * 60 * 24)
+  let decay = Math.exp(-daysSincePublished / 60)
+
+  if (hasCriticalKeywords(text)) {
+    decay = Math.max(decay, 0.5)
+  }
+
+  const recencyWeight = 0.15
+  const recencyBoost = recencyWeight * decay
+
+  if (recencyBoost > 0.01) {
+    const daysText = Math.round(daysSincePublished)
+    reasons.push(`recency boost: +${Math.round(recencyBoost * 100)}% (${daysText}d old)`)
+  }
+
+  return recencyBoost
+}
+
+function applyLifecycleModifiers(text: string, reasons: string[]): number {
+  const lowerText = text.toLowerCase()
+
+  // High-impact keywords
+  const breakingKeywords = ['breaking change', 'retirement', 'deprecation', 'deprecated', 'breaking']
+  for (const keyword of breakingKeywords) {
+    if (lowerText.includes(keyword)) {
+      reasons.push(`lifecycle: ${keyword} (+20%)`)
+      return 0.2
+    }
+  }
+
+  // GA/Release keywords
+  const gaKeywords = ['generally available', 'general availability', ' ga ', 'ga:']
+  for (const keyword of gaKeywords) {
+    if (lowerText.includes(keyword)) {
+      reasons.push(`lifecycle: GA (+12%)`)
+      return 0.12
+    }
+  }
+
+  // Security/Fix keywords
+  const securityKeywords = ['security', 'bug fix', 'vulnerability', 'patch']
+  for (const keyword of securityKeywords) {
+    if (lowerText.includes(keyword)) {
+      reasons.push(`lifecycle: ${keyword} (+8%)`)
+      return 0.08
+    }
+  }
+
+  // Cost/Billing keywords
+  const costKeywords = ['price', 'billing', 'cost', 'pricing']
+  for (const keyword of costKeywords) {
+    if (lowerText.includes(keyword)) {
+      reasons.push(`lifecycle: ${keyword} (+8%)`)
+      return 0.08
+    }
+  }
+
+  // Preview keywords (lower priority)
+  const previewKeywords = ['preview', 'public preview', 'private preview', 'beta']
+  for (const keyword of previewKeywords) {
+    if (lowerText.includes(keyword)) {
+      reasons.push(`lifecycle: ${keyword} (+6%)`)
+      return 0.06
+    }
+  }
+
+  return 0
 }
 
 function scoreText(text: string, providerTokens: string[], resourceTokens: string[], reasons: string[], weights: {provider:number,resource:number}) {
   let score = 0
   const t = text.toLowerCase()
-  // provider tokens
+
+  let bestProviderToken = ''
   for (const tok of providerTokens) {
     if (tok.length < 3) continue
-    if (t.includes(tok)) { score += weights.provider; reasons.push(`provider token: ${tok}`); break }
+    if (t.includes(tok)) {
+      // Prefer longer, more specific tokens
+      if (tok.length > bestProviderToken.length) {
+        bestProviderToken = tok
+      }
+    }
   }
-  // resource tokens
+
+  if (bestProviderToken) {
+    let providerScore = weights.provider
+      if (GENERIC_TOKENS.includes(bestProviderToken)) {
+      providerScore *= 0.5 // 50% penalty for generic tokens
+      reasons.push(`provider token (generic): ${bestProviderToken}`)
+    } else {
+      reasons.push(`provider token: ${bestProviderToken}`)
+    }
+    score += providerScore
+  }
+
   const fuse = new Fuse(resourceTokens.map(x => ({ t: x })), { keys: ['t'], includeScore: true, threshold: 0.35 })
-  let resourceHit = false
+  let bestResourceToken = ''
+  let isExactMatch = false
+
   for (const tok of resourceTokens) {
     if (tok.length < 3) continue
-    if (t.includes(tok)) { resourceHit = true; break }
+    if (t.includes(tok)) {
+      if (tok.length > bestResourceToken.length) {
+        bestResourceToken = tok
+        isExactMatch = true
+      }
+    }
   }
-  if (!resourceHit) {
+
+  if (!bestResourceToken) {
     const res = fuse.search(t)
-    if (res.length > 0 && (res[0].score ?? 1) < 0.25) resourceHit = true
+    if (res.length > 0 && (res[0].score ?? 1) < 0.25) {
+      bestResourceToken = res[0].item.t
+      isExactMatch = false
+    }
   }
-  if (resourceHit) { score += weights.resource; reasons.push('resource token match') }
+
+  if (bestResourceToken) {
+    let resourceScore = weights.resource
+      if (bestResourceToken.length > 8) {
+      resourceScore *= 1.2 // 20% bonus for specific tokens
+    }
+      if (GENERIC_TOKENS.includes(bestResourceToken)) {
+      resourceScore *= 0.5 // 50% penalty
+    }
+
+    const matchType = isExactMatch ? 'exact' : 'fuzzy'
+    reasons.push(`resource token (${matchType}): ${bestResourceToken}`)
+    score += resourceScore
+  }
+
   return Math.min(score, 1)
 }
 
 export function matchReleases(
   resourceTypes: Map<string, number>,
   releases: ReleaseItem[],
-  threshold = 0.3
+  threshold = 0.5
 ): MatchResult[] {
   const results: MatchResult[] = []
+  const maxResourceCount = Math.max(...resourceTypes.values())
   for (const [rt, count] of resourceTypes.entries()) {
     const { provider, resource } = splitResourceType(rt)
     const resourceWords = toWords(resource).split(' ').filter(Boolean)
@@ -101,12 +284,41 @@ export function matchReleases(
       s += scoreText(rel.title || '', providerTokens, resourceTokens, reasons, { provider: 0.25, resource: 0.45 })
       // Summary moderate weights
       s += 0.5 * scoreText(rel.summary || '', providerTokens, resourceTokens, reasons, { provider: 0.2, resource: 0.25 })
-      // Categories small bump
-      if (rel.categories && rel.categories.some(c => providerTokens.some(pt => c.toLowerCase().includes(pt)))) {
-        s += 0.15
-        reasons.push('provider in categories')
+      // Categories bonus - much more restrictive
+      if (rel.categories) {
+        let categoryScore = 0
+        const categories = rel.categories.map(c => c.toLowerCase())
+
+        for (const pt of providerTokens) {
+          if (pt.length < 4) continue
+          if (GENERIC_TOKENS.includes(pt)) continue
+
+          if (categories.some(c => c.includes(pt))) {
+            categoryScore = 0.1 // Reduced from 0.15
+            reasons.push(`provider in categories: ${pt}`)
+            break
+          }
+        }
+        s += categoryScore
       }
+
+      // Lifecycle/change-type modifiers
+      const lifecycleText = `${rel.title || ''} ${rel.summary || ''}`
+      s += applyLifecycleModifiers(lifecycleText, reasons)
+
       s = Math.min(s, 1)
+
+      // Inventory prevalence boost - higher scores for resource types you have more of
+      const prevalence = count / maxResourceCount
+      const prevalenceBoost = 0.12 * (1 / (1 + Math.exp(-6 * (prevalence - 0.5))) - 0.5) * 2
+      s = Math.min(1, s + prevalenceBoost)
+      if (prevalenceBoost > 0.01) {
+        reasons.push(`prevalence boost: +${Math.round(prevalenceBoost * 100)}%`)
+      }
+
+      // Recency boost with critical keyword exceptions
+      s += applyRecencyBoost(rel.published, lifecycleText, reasons)
+
       if (s >= threshold) {
         matches.push({
           id: rel.id,
@@ -188,32 +400,66 @@ function extractMentionedRegions(text: string): Set<string> {
 }
 
 function adjustForRegions(baseScore: number, rel: ReleaseItem, userRegions: Set<string>, reasons: string[]): number {
-  const regions = new Set<string>()
-  const add = (s?: string) => { for (const r of extractMentionedRegions(String(s || ''))) regions.add(r) }
+  const mentionedRegions = new Set<string>()
+  const add = (s?: string) => { for (const r of extractMentionedRegions(String(s || ''))) mentionedRegions.add(r) }
   add(rel.title)
   add(rel.summary)
   // Categories sometimes contain geography; include them too
   for (const c of (rel as any).categories || []) add(String(c))
 
-  if (regions.size === 0) return baseScore // not region-specific → no adjustment
+  if (mentionedRegions.size === 0) {
+    // No regions mentioned - check for global indicators
+    const globalText = `${rel.title || ''} ${rel.summary || ''}`.toLowerCase()
+    if (userRegions.size >= 3 && !globalText.includes('selected regions') && !globalText.includes('limited regions')) {
+      // Global release for multi-region tenant gets small boost
+      reasons.push('global release (+3%)')
+      return Math.min(1, baseScore + 0.03)
+    }
+    return baseScore // no adjustment for single-region tenants
+  }
 
-  const hasOverlap = Array.from(regions).some(r => userRegions.has(r))
-  if (!hasOverlap) {
-    reasons.push('region mismatch')
-    return Math.max(0, baseScore * 0.6) // down-weight if only other regions are mentioned
+  // Calculate region coverage ratio
+  const overlappingRegions = Array.from(mentionedRegions).filter(r => userRegions.has(r))
+  const overlapCount = overlappingRegions.length
+
+  if (overlapCount === 0) {
+    // No overlap - apply mismatch penalty
+    const globalText = `${rel.title || ''} ${rel.summary || ''}`.toLowerCase()
+    if (globalText.includes('selected regions') || globalText.includes('limited regions')) {
+      // Harsh penalty for explicitly limited rollouts
+      reasons.push('region mismatch (limited rollout)')
+      return Math.max(0, baseScore * 0.5)
+    } else {
+      // Standard mismatch penalty
+      reasons.push('region mismatch')
+      return Math.max(0, baseScore * 0.6)
+    }
   } else {
-    reasons.push('region match')
-    return Math.min(1, baseScore + 0.1) // small boost when explicitly in-customer regions
+    // Calculate coverage-based boost
+    const coverage = overlapCount / Math.max(1, mentionedRegions.size)
+    const regionStrengthBoost = Math.min(0.15, 0.15 * coverage)
+
+    // Additional boost if mentioned explicitly in title
+    const titleBoost = overlappingRegions.some(region =>
+      (rel.title || '').toLowerCase().includes(region.replace(' ', '')) ||
+      (rel.title || '').toLowerCase().includes(region)
+    ) ? 0.03 : 0
+
+    const totalBoost = regionStrengthBoost + titleBoost
+    reasons.push(`region match: ${overlapCount}/${mentionedRegions.size} regions (+${Math.round(totalBoost * 100)}%)`)
+
+    return Math.min(1, baseScore + totalBoost)
   }
 }
 
 export function matchReleasesRegional(
   inventory: RegionAwareInventory,
   releases: ReleaseItem[],
-  threshold = 0.3
+  threshold = 0.5
 ): MatchResult[] {
   const { byType, regions: userRegions } = inventory
   const results: MatchResult[] = []
+  const maxResourceCount = Math.max(...byType.values())
   for (const [rt, count] of byType.entries()) {
     const { provider, resource } = splitResourceType(rt)
     const resourceWords = toWords(resource).split(' ').filter(Boolean)
@@ -226,12 +472,43 @@ export function matchReleasesRegional(
       let s = 0
       s += scoreText(rel.title || '', providerTokens, resourceTokens, reasons, { provider: 0.25, resource: 0.45 })
       s += 0.5 * scoreText(rel.summary || '', providerTokens, resourceTokens, reasons, { provider: 0.2, resource: 0.25 })
-      if ((rel as any).categories && (rel as any).categories.some((c: string) => providerTokens.some(pt => c.toLowerCase().includes(pt)))) {
-        s += 0.15
-        reasons.push('provider in categories')
+      // Categories bonus - much more restrictive
+      if ((rel as any).categories) {
+        let categoryScore = 0
+        const categories = (rel as any).categories.map((c: string) => c.toLowerCase())
+
+        for (const pt of providerTokens) {
+          if (pt.length < 4) continue
+          if (GENERIC_TOKENS.includes(pt)) continue
+
+          if (categories.some((c: string) => c.includes(pt))) {
+            categoryScore = 0.1 // Reduced from 0.15
+            reasons.push(`provider in categories: ${pt}`)
+            break
+          }
+        }
+        s += categoryScore
       }
+
+      // Lifecycle/change-type modifiers
+      const lifecycleText = `${rel.title || ''} ${rel.summary || ''}`
+      s += applyLifecycleModifiers(lifecycleText, reasons)
+
+      s = Math.min(s, 1)
+
+      // Inventory prevalence boost - higher scores for resource types you have more of
+      const prevalence = count / maxResourceCount
+      const prevalenceBoost = 0.12 * (1 / (1 + Math.exp(-6 * (prevalence - 0.5))) - 0.5) * 2
+      s = Math.min(1, s + prevalenceBoost)
+      if (prevalenceBoost > 0.01) {
+        reasons.push(`prevalence boost: +${Math.round(prevalenceBoost * 100)}%`)
+      }
+
+      // Recency boost with critical keyword exceptions
+      s += applyRecencyBoost(rel.published, lifecycleText, reasons)
+
       // Region adjustment
-      s = adjustForRegions(Math.min(s, 1), rel, userRegions, reasons)
+      s = adjustForRegions(s, rel, userRegions, reasons)
       s = Math.min(s, 1)
       if (s >= threshold) {
         matches.push({

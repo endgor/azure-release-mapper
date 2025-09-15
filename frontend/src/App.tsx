@@ -39,23 +39,18 @@ export default function App() {
 
   async function handleCsvParsed(inv: RegionAwareInventory) {
     setInventory(inv)
-    
-    // Automatically start analysis after showing success state
+
     if (rssStatus === 'ready') {
-      // Show success state for a brief moment, then hide uploader and start analyzing
       setTimeout(() => {
-        // Hide uploader and start analysis (but don't animate header yet)
         setShowUploader(false)
         setAnalyzing(true)
-        
-        // Start the actual analysis
+
         setTimeout(async () => {
           try {
             const base = matchReleasesRegional(inv, releases)
             const final = await aiAugment(releases, base)
             setResults(final)
-            
-            // Only after analysis is complete, trigger the header animation
+
             setTimeout(() => {
               setHeaderCompact(true)
             }, 100)
@@ -63,9 +58,8 @@ export default function App() {
             setAnalyzing(false)
           }
         }, 300)
-      }, 600) // Brief delay to show success state
+      }, 600)
     } else {
-      // If RSS isn't ready yet, just hide the uploader
       setTimeout(() => {
         setShowUploader(false)
       }, 800)
@@ -74,9 +68,7 @@ export default function App() {
 
   function handleShowUploader() {
     setShowUploader(true)
-    // Optionally expand header again when showing uploader
     setHeaderCompact(false)
-    // Reset the uploader by changing its key
     setUploaderKey(prev => prev + 1)
   }
 
@@ -86,18 +78,15 @@ export default function App() {
       <Header isCompact={headerCompact} />
       
       <main className="flex-1 container mx-auto px-6 py-8 max-w-7xl">
-        {/* File Upload Section - Conditionally shown with animation */}
         <section className={`${showUploader ? 'upload-section-expanded' : 'upload-section-collapsed'}`}>
           <div className="max-w-2xl mx-auto">
             <CsvUploader key={uploaderKey} onParsed={handleCsvParsed} />
           </div>
         </section>
 
-        {/* Action Section */}
         <section className="mb-6">
           <div className="flex flex-col sm:flex-row items-center justify-center space-y-3 sm:space-y-0 sm:space-x-4">
             
-            {/* Status Messages */}
             {rssStatus === 'loading' && (
               <div className="flex items-center space-x-2 text-blue-600">
                 <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -113,11 +102,10 @@ export default function App() {
               </div>
             )}
 
-            {/* Action buttons - only shown after results are available */}
             {results.length > 0 && (
               <>
-                <button 
-                  className="btn btn-ghost animate-slide-in" 
+                <button
+                  className="btn btn-ghost animate-slide-in"
                   onClick={handleShowUploader}
                 >
                   <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -125,9 +113,9 @@ export default function App() {
                   </svg>
                   Upload New File
                 </button>
-                
-                <button 
-                  className="btn btn-ghost animate-slide-in" 
+
+                <button
+                  className="btn btn-ghost animate-slide-in"
                   onClick={() => downloadResultsCsv(results)}
                 >
                   <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -139,7 +127,6 @@ export default function App() {
             )}
           </div>
 
-          {/* Analysis Progress */}
           {analyzing && (
             <div className="mt-4 max-w-md mx-auto">
               <div className="card p-4 animate-lift-up">
@@ -159,11 +146,9 @@ export default function App() {
           )}
         </section>
 
-        {/* Results Section */}
         {results.length > 0 && <ResultsTable results={results} />}
       </main>
 
-      {/* Footer */}
       <footer className="bg-white/50 backdrop-blur-sm border-t border-slate-200/50 py-4 mt-12">
         <div className="container mx-auto px-6 text-center">
           <a 

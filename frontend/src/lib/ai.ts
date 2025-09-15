@@ -1,7 +1,6 @@
 import type { MatchResult, ReleaseItem } from './types'
 
 export function buildAiPayload(release: ReleaseItem, resourceTypes: string[]) {
-  // Payload expected by server-side Ollama proxy
   return { release: { title: release.title, summary: release.summary, id: release.id, link: release.link, published: release.published }, resourceTypes }
 }
 
@@ -22,7 +21,6 @@ export async function aiAugment(
   const byType = new Map(initial.map(r => [r.resourceType, r]))
   const resourceTypes = initial.map(r => r.resourceType)
 
-  // Batch up to 15 releases to avoid rate/size issues
   const batchSize = 10
   for (let i = 0; i < releases.length; i += batchSize) {
     const batch = releases.slice(i, i + batchSize)
@@ -37,7 +35,6 @@ export async function aiAugment(
           const summary = String(m.impact_summary ?? '')
           const row = byType.get(rt)
           if (!row) continue
-          // find release match in row or add if missing and confidence decent
           const existing = row.matchedReleases.find(x => x.id === rel.id)
           if (existing) {
             existing.aiSummary = summary
@@ -56,12 +53,10 @@ export async function aiAugment(
           }
         }
       } catch {
-        // ignore AI errors per plan; keep heuristic results
       }
     }
   }
 
-  // Recompute overall score and top impact summaries
   for (const r of byType.values()) {
     r.matchedReleases.sort((a, b) => {
       const ta = Date.parse(a.published || '') || 0
