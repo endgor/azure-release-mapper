@@ -14,51 +14,42 @@ export async function analyzeWithOllama(payload: any) {
   return res.json()
 }
 
-export async function aiAugment(
-  releases: ReleaseItem[],
-  initial: MatchResult[]
-): Promise<MatchResult[]> {
-  const byType = new Map(initial.map(r => [r.resourceType, r]))
-  const resourceTypes = initial.map(r => r.resourceType)
-
-  const batchSize = 10
-  for (let i = 0; i < releases.length; i += batchSize) {
-    const batch = releases.slice(i, i + batchSize)
-    for (const rel of batch) {
-      const payload = buildAiPayload(rel, resourceTypes)
-      try {
-        const out = await analyzeWithOllama(payload)
-        const arr: any[] = Array.isArray(out?.matches) ? out.matches : []
-        for (const m of arr) {
-          const rt = String(m.resource_type ?? '')
-          const conf = Number(m.confidence ?? 0)
-          const summary = String(m.impact_summary ?? '')
-          const row = byType.get(rt)
-          if (!row) continue
-          const existing = row.matchedReleases.find(x => x.id === rel.id)
-          if (existing) {
-            existing.aiSummary = summary
-            existing.aiConfidence = conf
-          } else if (conf >= 0.4) {
-            row.matchedReleases.push({
-              id: rel.id,
-              title: rel.title,
-              link: rel.link,
-              published: rel.published,
-              relevanceScore: conf,
-              reasons: ['AI-matched'],
-              aiSummary: summary,
-              aiConfidence: conf
-            })
-          }
-        }
-      } catch {
-      }
-    }
+function applyAiMatch(byType: Map<string, MatchResult>, rel: ReleaseItem, match: any) {
+  const row = byType.get(String(match?.resource_type ?? ''))
+  if (!row) return
+  const conf = Number(match?.confidence ?? 0)
+  const summary = String(match?.impact_summary ?? '')
+  const existing = row.matchedReleases.find(x => x.id === rel.id)
+  if (existing) {
+    existing.aiSummary = summary
+    existing.aiConfidence = conf
+  } else if (conf >= 0.4) {
+    row.matchedReleases.push({
+      id: rel.id,
+      title: rel.title,
+      link: rel.link,
+      published: rel.published,
+      relevanceScore: conf,
+      reasons: ['AI-matched'],
+      aiSummary: summary,
+      aiConfidence: conf
+    })
   }
+}
 
-  for (const r of byType.values()) {
-    r.matchedReleases.sort((a, b) => {
+async function processRelease(rel: ReleaseItem, resourceTypes: string[], byType: Map<string, MatchResult>) {
+  try {
+    const out = await analyzeWithOllama(buildAiPayload(rel, resourceTypes))
+    for (const match of Array.isArray(out?.matches) ? out.matches : []) {
+      applyAiMatch(byType, rel, match)
+    }
+  } catch {
+  }
+}
+
+function finalize(byType: Map<string, MatchResult>): MatchResult[] {
+  return Array.from(byType.values(), row => {
+    row.matchedReleases.sort((a, b) => {
       const ta = Date.parse(a.published || '') || 0
       const tb = Date.parse(b.published || '') || 0
       if (tb !== ta) return tb - ta
@@ -66,9 +57,25 @@ export async function aiAugment(
       const bs = Math.max(b.relevanceScore, b.aiConfidence ?? 0)
       return bs - as
     })
-    r.overallScore = r.matchedReleases.length ? Math.max(...r.matchedReleases.map(m => Math.max(m.relevanceScore, m.aiConfidence ?? 0))) : 0
-    r.topImpactSummary = r.matchedReleases[0]?.aiSummary
+    row.overallScore = row.matchedReleases.length ? Math.max(...row.matchedReleases.map(m => Math.max(m.relevanceScore, m.aiConfidence ?? 0))) : 0
+    row.topImpactSummary = row.matchedReleases[0]?.aiSummary
+    return row
+  }).sort((a, b) => (b.overallScore - a.overallScore) || (b.resourceCount - a.resourceCount))
+}
+
+export async function aiAugment(
+  releases: ReleaseItem[],
+  initial: MatchResult[]
+): Promise<MatchResult[]> {
+  const byType = new Map(initial.map(r => [r.resourceType, r]))
+  const resourceTypes = initial.map(r => r.resourceType)
+  const batchSize = 10
+
+  for (let i = 0; i < releases.length; i += batchSize) {
+    for (const rel of releases.slice(i, i + batchSize)) {
+      await processRelease(rel, resourceTypes, byType)
+    }
   }
 
-  return Array.from(byType.values()).sort((a, b) => (b.overallScore - a.overallScore) || (b.resourceCount - a.resourceCount))
+  return finalize(byType)
 }

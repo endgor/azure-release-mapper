@@ -263,82 +263,92 @@ function scoreText(text: string, providerTokens: string[], resourceTokens: strin
   return Math.min(score, 1)
 }
 
-export function matchReleases(
+function baseMatchScore(
+  rel: ReleaseItem,
+  providerTokens: string[],
+  resourceTokens: string[],
+  reasons: string[],
+  count: number,
+  maxResourceCount: number,
+  categories: string[]
+): number {
+  let score = 0
+  score += scoreText(rel.title || '', providerTokens, resourceTokens, reasons, { provider: 0.25, resource: 0.45 })
+  score += 0.5 * scoreText(rel.summary || '', providerTokens, resourceTokens, reasons, { provider: 0.2, resource: 0.25 })
+
+  // Categories bonus - much more restrictive
+  if (categories.length) {
+    let categoryScore = 0
+    const normalizedCategories = categories.map(c => c.toLowerCase())
+    for (const pt of providerTokens) {
+      if (pt.length < 4 || GENERIC_TOKENS.includes(pt)) continue
+      if (normalizedCategories.some(c => c.includes(pt))) {
+        categoryScore = 0.1 // Reduced from 0.15
+        reasons.push(`provider in categories: ${pt}`)
+        break
+      }
+    }
+    score += categoryScore
+  }
+
+  const lifecycleText = `${rel.title || ''} ${rel.summary || ''}`
+  score += applyLifecycleModifiers(lifecycleText, reasons)
+  score = Math.min(score, 1)
+
+  // Inventory prevalence boost - higher scores for resource types you have more of
+  const prevalence = count / maxResourceCount
+  const prevalenceBoost = 0.12 * (1 / (1 + Math.exp(-6 * (prevalence - 0.5))) - 0.5) * 2
+  score = Math.min(1, score + prevalenceBoost)
+  if (prevalenceBoost > 0.01) {
+    reasons.push(`prevalence boost: +${Math.round(prevalenceBoost * 100)}%`)
+  }
+
+  // Recency boost with critical keyword exceptions
+  return score + applyRecencyBoost(rel.published, lifecycleText, reasons)
+}
+
+function buildMatchResults(
   resourceTypes: Map<string, number>,
   releases: ReleaseItem[],
-  threshold = 0.5
+  threshold: number,
+  adjust?: (score: number, rel: ReleaseItem, reasons: string[]) => number
 ): MatchResult[] {
   const results: MatchResult[] = []
   const maxResourceCount = Math.max(...resourceTypes.values())
+
   for (const [rt, count] of resourceTypes.entries()) {
     const { provider, resource } = splitResourceType(rt)
     const resourceWords = toWords(resource).split(' ').filter(Boolean)
     const resourceTokens = tokensFromResource(resource)
     const providerTokens = tokensFromProvider(provider, resourceWords)
-
     const matches: MatchRelease[] = []
+
     for (const rel of releases) {
       const reasons: string[] = []
-      let s = 0
-      // Title heavy weights
-      s += scoreText(rel.title || '', providerTokens, resourceTokens, reasons, { provider: 0.25, resource: 0.45 })
-      // Summary moderate weights
-      s += 0.5 * scoreText(rel.summary || '', providerTokens, resourceTokens, reasons, { provider: 0.2, resource: 0.25 })
-      // Categories bonus - much more restrictive
-      if (rel.categories) {
-        let categoryScore = 0
-        const categories = rel.categories.map(c => c.toLowerCase())
+      const categories = ((rel as any).categories || []) as string[]
+      let score = baseMatchScore(rel, providerTokens, resourceTokens, reasons, count, maxResourceCount, categories)
+      if (adjust) score = Math.min(1, adjust(score, rel, reasons))
 
-        for (const pt of providerTokens) {
-          if (pt.length < 4) continue
-          if (GENERIC_TOKENS.includes(pt)) continue
-
-          if (categories.some(c => c.includes(pt))) {
-            categoryScore = 0.1 // Reduced from 0.15
-            reasons.push(`provider in categories: ${pt}`)
-            break
-          }
-        }
-        s += categoryScore
-      }
-
-      // Lifecycle/change-type modifiers
-      const lifecycleText = `${rel.title || ''} ${rel.summary || ''}`
-      s += applyLifecycleModifiers(lifecycleText, reasons)
-
-      s = Math.min(s, 1)
-
-      // Inventory prevalence boost - higher scores for resource types you have more of
-      const prevalence = count / maxResourceCount
-      const prevalenceBoost = 0.12 * (1 / (1 + Math.exp(-6 * (prevalence - 0.5))) - 0.5) * 2
-      s = Math.min(1, s + prevalenceBoost)
-      if (prevalenceBoost > 0.01) {
-        reasons.push(`prevalence boost: +${Math.round(prevalenceBoost * 100)}%`)
-      }
-
-      // Recency boost with critical keyword exceptions
-      s += applyRecencyBoost(rel.published, lifecycleText, reasons)
-
-      if (s >= threshold) {
+      if (score >= threshold) {
         matches.push({
           id: rel.id,
           title: rel.title,
           link: rel.link,
           published: rel.published,
-          relevanceScore: s,
+          relevanceScore: score,
           reasons,
-          categories: rel.categories || []
+          categories
         })
       }
     }
 
-    // Sort by score (desc) primarily, then by published date (desc)
     matches.sort((a, b) => {
       if (b.relevanceScore !== a.relevanceScore) return b.relevanceScore - a.relevanceScore
       const ta = Date.parse(a.published || '') || 0
       const tb = Date.parse(b.published || '') || 0
       return tb - ta
     })
+
     const overall = matches.length ? Math.max(...matches.map(m => m.relevanceScore)) : 0
     results.push({
       resourceType: rt,
@@ -347,7 +357,16 @@ export function matchReleases(
       overallScore: overall
     })
   }
+
   return results.sort((a, b) => (b.overallScore - a.overallScore) || (b.resourceCount - a.resourceCount))
+}
+
+export function matchReleases(
+  resourceTypes: Map<string, number>,
+  releases: ReleaseItem[],
+  threshold = 0.5
+): MatchResult[] {
+  return buildMatchResults(resourceTypes, releases, threshold)
 }
 
 // --- Region-aware extensions ---
@@ -457,85 +476,8 @@ export function matchReleasesRegional(
   releases: ReleaseItem[],
   threshold = 0.5
 ): MatchResult[] {
-  const { byType, regions: userRegions } = inventory
-  const results: MatchResult[] = []
-  const maxResourceCount = Math.max(...byType.values())
-  for (const [rt, count] of byType.entries()) {
-    const { provider, resource } = splitResourceType(rt)
-    const resourceWords = toWords(resource).split(' ').filter(Boolean)
-    const resourceTokens = tokensFromResource(resource)
-    const providerTokens = tokensFromProvider(provider, resourceWords)
-
-    const matches: MatchRelease[] = []
-    for (const rel of releases) {
-      const reasons: string[] = []
-      let s = 0
-      s += scoreText(rel.title || '', providerTokens, resourceTokens, reasons, { provider: 0.25, resource: 0.45 })
-      s += 0.5 * scoreText(rel.summary || '', providerTokens, resourceTokens, reasons, { provider: 0.2, resource: 0.25 })
-      // Categories bonus - much more restrictive
-      if ((rel as any).categories) {
-        let categoryScore = 0
-        const categories = (rel as any).categories.map((c: string) => c.toLowerCase())
-
-        for (const pt of providerTokens) {
-          if (pt.length < 4) continue
-          if (GENERIC_TOKENS.includes(pt)) continue
-
-          if (categories.some((c: string) => c.includes(pt))) {
-            categoryScore = 0.1 // Reduced from 0.15
-            reasons.push(`provider in categories: ${pt}`)
-            break
-          }
-        }
-        s += categoryScore
-      }
-
-      // Lifecycle/change-type modifiers
-      const lifecycleText = `${rel.title || ''} ${rel.summary || ''}`
-      s += applyLifecycleModifiers(lifecycleText, reasons)
-
-      s = Math.min(s, 1)
-
-      // Inventory prevalence boost - higher scores for resource types you have more of
-      const prevalence = count / maxResourceCount
-      const prevalenceBoost = 0.12 * (1 / (1 + Math.exp(-6 * (prevalence - 0.5))) - 0.5) * 2
-      s = Math.min(1, s + prevalenceBoost)
-      if (prevalenceBoost > 0.01) {
-        reasons.push(`prevalence boost: +${Math.round(prevalenceBoost * 100)}%`)
-      }
-
-      // Recency boost with critical keyword exceptions
-      s += applyRecencyBoost(rel.published, lifecycleText, reasons)
-
-      // Region adjustment
-      s = adjustForRegions(s, rel, userRegions, reasons)
-      s = Math.min(s, 1)
-      if (s >= threshold) {
-        matches.push({
-          id: rel.id,
-          title: rel.title,
-          link: rel.link,
-          published: rel.published,
-          relevanceScore: s,
-          reasons,
-          categories: (rel as any).categories || []
-        })
-      }
-    }
-
-    matches.sort((a, b) => {
-      if (b.relevanceScore !== a.relevanceScore) return b.relevanceScore - a.relevanceScore
-      const ta = Date.parse(a.published || '') || 0
-      const tb = Date.parse(b.published || '') || 0
-      return tb - ta
-    })
-    const overall = matches.length ? Math.max(...matches.map(m => m.relevanceScore)) : 0
-    results.push({
-      resourceType: rt,
-      resourceCount: count,
-      matchedReleases: matches,
-      overallScore: overall
-    })
-  }
-  return results.sort((a, b) => (b.overallScore - a.overallScore) || (b.resourceCount - a.resourceCount))
+  const { byType, regions } = inventory
+  return buildMatchResults(byType, releases, threshold, (score, rel, reasons) =>
+    adjustForRegions(score, rel, regions, reasons)
+  )
 }

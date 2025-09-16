@@ -17,11 +17,11 @@ export default function CsvUploader({ onParsed }: Props) {
       setError('Please upload a CSV file')
       return
     }
-    
+
     setIsProcessing(true)
     setError(null)
     setFileName(file.name)
-    
+
     try {
       const inv = await parseResourceCsvWithRegions(file)
       if (inv.byType.size === 0) {
@@ -37,32 +37,16 @@ export default function CsvUploader({ onParsed }: Props) {
     }
   }
 
-  function handleFileSelect(file?: File) {
-    if (file) processFile(file)
-  }
-
-  function handleDragEnter(e: DragEvent) {
-    e.preventDefault()
-    e.stopPropagation()
-    setIsDragOver(true)
-  }
-
-  function handleDragLeave(e: DragEvent) {
-    e.preventDefault()
-    e.stopPropagation()
-    setIsDragOver(false)
-  }
-
-  function handleDragOver(e: DragEvent) {
-    e.preventDefault()
-    e.stopPropagation()
-  }
+  const handleFileSelect = (file?: File) => { if (file) processFile(file) }
+  const stop = (e: DragEvent) => { e.preventDefault(); e.stopPropagation() }
+  const handleDragEnter = (e: DragEvent) => { stop(e); setIsDragOver(true) }
+  const handleDragLeave = (e: DragEvent) => { stop(e); setIsDragOver(false) }
+  const handleDragOver = stop
 
   function handleDrop(e: DragEvent) {
-    e.preventDefault()
-    e.stopPropagation()
+    stop(e)
     setIsDragOver(false)
-    
+
     const files = Array.from(e.dataTransfer.files)
     const csvFile = files.find(file => file.name.toLowerCase().endsWith('.csv'))
     if (csvFile) {
