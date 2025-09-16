@@ -184,10 +184,10 @@ export default function ResultsTable({ results }: Props) {
   const isAllMonths = selectedMonths.length === 0
   const isAllStatuses = selectedStatuses.length === 0
   const isAllTags = selectedTags.length === 0
-  const toggleMonth = (monthNum: number) => {
+  const toggleMonth = (month: string) => {
     setSelectedMonths(prev => {
-      const has = prev.includes(monthNum)
-      const next = has ? prev.filter(m => m !== monthNum) : [...prev, monthNum]
+      const has = prev.includes(month)
+      const next = has ? prev.filter(m => m !== month) : [...prev, month]
       // If none selected, treat as All
       return next
     })
