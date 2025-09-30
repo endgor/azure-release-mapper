@@ -22,7 +22,7 @@ export default function Header({ isCompact = false }: HeaderProps) {
           </h1>
           <div className={isCompact ? 'header-description-hidden' : 'header-description'}>
             <p className="text-lg lg:text-xl text-blue-100/90 max-w-4xl leading-relaxed">
-              Intelligently map Azure release notes to your infrastructure. Upload your resource inventory and discover relevant updates with AI-powered analysis.
+              Intelligently map Azure release notes to your infrastructure. Upload your resource inventory and discover relevant updates with our heuristic scoring engine.
             </p>
           </div>
         </div>

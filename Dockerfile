@@ -1,4 +1,4 @@
-# Multi-stage build: frontend, server, then final runtime with Ollama + Node
+# Multi-stage build: frontend, server, then final runtime with Node
 
 # ---------- Frontend build ----------
 FROM node:20-alpine AS frontend-builder
@@ -19,15 +19,11 @@ RUN npm run build
 # ---------- Final runtime ----------
 FROM node:20-bookworm-slim
 
-# Install curl and dependencies, then install Ollama
-RUN apt-get update && apt-get install -y bash curl ca-certificates && rm -rf /var/lib/apt/lists/* \
-    && curl -fsSL https://ollama.com/install.sh | sh
+# Install basic dependencies
+RUN apt-get update && apt-get install -y bash curl ca-certificates && rm -rf /var/lib/apt/lists/*
 
 ENV NODE_ENV=production \
-    PORT=8787 \
-    OLLAMA_HOST=127.0.0.1 \
-    OLLAMA_PORT=11434 \
-    OLLAMA_MODEL=phi3.5:mini
+    PORT=8787
 
 WORKDIR /app
 
@@ -40,7 +36,7 @@ COPY --from=server-builder /app/server/dist /app/server/dist
 RUN mkdir -p /app/server/dist/public
 COPY --from=frontend-builder /app/frontend/dist /app/server/dist/public
 
-# Add startup script to run Ollama + Node server
+# Add startup script to run Node server
 COPY ./start.sh /app/start.sh
 RUN chmod +x /app/start.sh
 

@@ -82,14 +82,6 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
               name: 'PORT'
               value: '8787'
             }
-            {
-              name: 'OLLAMA_MODEL'
-              value: 'phi3.5:mini'
-            }
-            {
-              name: 'OLLAMA_HOST'
-              value: '127.0.0.1'
-            }
           ]
           resources: {
             cpu: 2

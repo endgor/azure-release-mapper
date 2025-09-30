@@ -2,7 +2,7 @@ import type { MatchResult } from './types'
 
 export function downloadResultsCsv(results: MatchResult[]) {
   const rows = [
-    ['resource_type', 'resource_count', 'overall_score', 'match_count', 'matches', 'top_impact_summary']
+    ['resource_type', 'resource_count', 'overall_score', 'match_count', 'matches']
   ]
   for (const r of results) {
     const matches = r.matchedReleases.slice(0, 10).map(m => `${m.title} (${m.link})`).join('; ')
@@ -11,8 +11,7 @@ export function downloadResultsCsv(results: MatchResult[]) {
       String(r.resourceCount),
       r.overallScore.toFixed(2),
       String(r.matchedReleases.length),
-      matches,
-      r.topImpactSummary ?? ''
+      matches
     ])
   }
   const csv = rows.map(r => r.map(cell => escapeCsv(cell)).join(',')).join('\n')

@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import Header from './components/Header'
 import CsvUploader from './components/CsvUploader'
 import ResultsTable from './components/ResultsTable'
 import { fetchRss } from './lib/rss'
-import { matchReleasesRegional } from './lib/match'
-import { aiAugment } from './lib/ai'
+import { matchReleases } from './lib/match'
 import type { MatchResult, RegionAwareInventory } from './lib/types'
 import { downloadResultsCsv } from './lib/download'
 
@@ -45,11 +44,10 @@ export default function App() {
         setShowUploader(false)
         setAnalyzing(true)
 
-        setTimeout(async () => {
+        setTimeout(() => {
           try {
-            const base = matchReleasesRegional(inv, releases)
-            const final = await aiAugment(releases, base)
-            setResults(final)
+            const results = matchReleases(inv, releases)
+            setResults(results)
 
             setTimeout(() => {
               setHeaderCompact(true)

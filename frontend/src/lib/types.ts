@@ -15,15 +15,12 @@ export interface MatchRelease {
   relevanceScore: number
   reasons: string[]
   categories?: string[]
-  aiSummary?: string
-  aiConfidence?: number
 }
 
 export interface MatchResult {
   resourceType: string
   resourceCount: number
   matchedReleases: MatchRelease[]
-  topImpactSummary?: string
   overallScore: number
 }
 

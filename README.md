@@ -7,11 +7,11 @@ A full-stack web application that helps CloudOps teams map Azure release notes t
 This application intelligently matches Azure release announcements to your specific resource types using:
 - **CSV Upload**: Support for both Azure Portal "All resources" exports and CloudOps environment exports
 - **Azure Release Feed**: Real-time Azure release notes via RSS feed
-- **AI-Powered Matching**: Local Ollama AI (Phi-3.5 mini) for intelligent release-to-resource correlation
+- **Smart Matching**: Intelligent release-to-resource correlation using keyword and pattern matching
 - **Export Results**: Download matched results as CSV for reporting and tracking
 
 **Key Benefits:**
-- No external API keys required (uses local AI)
+- No external API keys required
 - Supports both Azure and CloudOps CSV formats
 - Fast, intelligent matching of releases to your infrastructure
 - Self-contained deployment with Docker
@@ -20,7 +20,6 @@ This application intelligently matches Azure release announcements to your speci
 
 - **Frontend**: React + TypeScript + Vite + Tailwind CSS
 - **Backend**: Node.js + Express + TypeScript
-- **AI**: Local Ollama (Phi-3.5 mini model)
 - **Deployment**: Docker + Azure Container Apps
 - **CI/CD**: GitHub Actions
 
@@ -92,7 +91,7 @@ az deployment sub create -l westeurope -f infra/main.bicep -p infra/main.biceppa
 ```
 
 ### Architecture Notes
-- Single container runs Node.js API + local Ollama AI server
+- Single container runs Node.js API server
 - Frontend served statically by the API
-- No external API keys or cloud AI services required
+- No external API keys required
 - Supports 2-4 vCPU / 4-8 GiB depending on region limits

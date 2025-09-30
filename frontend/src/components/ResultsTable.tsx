@@ -12,61 +12,7 @@ function getTagClasses(tag: string): string {
     return 'bg-green-100 text-green-800 border border-green-200'
   }
   if (/(in preview|public preview|private preview|preview)/.test(t)) {
-    return 'bg-amber-100 text-amber-800 border border-amber-200'
-  }
-  if (/(deprecated|retired|retirement|end of support|removal)/.test(t)) {
-    return 'bg-rose-100 text-rose-800 border border-rose-200'
-  }
-  if (/(breaking change|breaking)/.test(t)) {
-    return 'bg-red-100 text-red-800 border border-red-200'
-  }
-  if (/(security|vulnerability|cve)/.test(t)) {
-    return 'bg-red-100 text-red-800 border border-red-200'
-  }
-  // Change-type hints
-  if (/(update|improvement|enhancement|enhanced|improved)/.test(t)) {
-    return 'bg-blue-100 text-blue-800 border border-blue-200'
-  }
-  if (/(bug|fix|resolved)/.test(t)) {
-    return 'bg-teal-100 text-teal-800 border border-teal-200'
-  }
-
-  // Soft product family coloring (limited palette – avoids rainbow). Softer text at 700.
-  if (/(compute|virtual machine|virtual machines|vm scale|vmss|compute gallery|proximity placement)/.test(t)) {
-    return 'bg-sky-100 text-sky-700 border border-sky-200'
-  }
-  if (/(container|kubernetes|aks|acr|helm|k8s)/.test(t)) {
-    return 'bg-cyan-100 text-cyan-700 border border-cyan-200'
-  }
-  // Networking, broadened to private endpoints and connectivity
-  if (/(network|vnet|virtual network|dns|cdn|front door|firewall|load balancer|application gateway|traffic manager|private link|private endpoint|express ?route|expressroute|vpn|vwan|virtual wan|nsg|route table|peering|bastion)/.test(t)) {
-    return 'bg-indigo-100 text-indigo-700 border border-indigo-200'
-  }
-  if (/(storage|backup|blob|disk|disks|files|file share|data ?lake|netapp)/.test(t)) {
-    return 'bg-violet-100 text-violet-700 border border-violet-200'
-  }
-  if (/(database|sql|cosmos|postgres|postgresql|mysql|mariadb|redis|cache)/.test(t)) {
-    return 'bg-teal-100 text-teal-700 border border-teal-200'
-  }
-
-  // AI & Machine Learning (group together)
-  if (/(\bai\b|azure ai|ai foundry|ai studio|machine learning|azure machine learning|\baml\b|mlops|cognitive services|vision|speech|language|openai)/.test(t)) {
-    return 'bg-fuchsia-100 text-fuchsia-700 border border-fuchsia-200'
-  }
-
-  // Identity & access (Entra, AAD, RBAC, managed identity, Key Vault)
-  if (/(entra|azure active directory|\baad\b|managed identity|service principal|rbac|role[- ]based access|key vault)/.test(t)) {
-    return 'bg-purple-100 text-purple-700 border border-purple-200'
-  }
-
-  // Monitoring & observability (Monitor, Log Analytics, App Insights, metrics/alerts)
-  if (/(azure monitor|monitoring|log analytics|application insights|app insights|insights|metrics|alerts?|diagnostic settings|grafana|prometheus)/.test(t)) {
-    return 'bg-lime-100 text-lime-700 border border-lime-200'
-  }
-
-  // Governance & management (Policy, Blueprints, Cost, Advisor, Resource Graph, Purview)
-  if (/(policy|blueprint|blueprints|cost management|advisor|resource graph|purview|management and governance)/.test(t)) {
-    return 'bg-stone-100 text-stone-700 border border-stone-200'
+    return 'bg-yellow-100 text-yellow-800 border border-yellow-200'
   }
 
   // Default/product tags → neutral gray
@@ -135,18 +81,12 @@ export default function ResultsTable({ results }: Props) {
   const monthRef = useRef<HTMLDivElement | null>(null)
   const statusRef = useRef<HTMLDivElement | null>(null)
   const tagsRef = useRef<HTMLDivElement | null>(null)
-  // Selected year-month combinations as strings (e.g., '2024-11'). Empty = All months
   const [selectedMonths, setSelectedMonths] = useState<string[]>([])
-  // Selected statuses. Empty = All statuses
   const [selectedStatuses, setSelectedStatuses] = useState<Array<'launched' | 'preview'>>([])
-  // Selected category tags. Empty = All tags
   const [selectedTags, setSelectedTags] = useState<string[]>([])
-  // Search within tags dropdown
   const [tagSearch, setTagSearch] = useState('')
-  // Entra filter checkbox
   const [showEntraOnly, setShowEntraOnly] = useState(false)
-  // Relevance score threshold filter
-  const [minScore, setMinScore] = useState(50)
+  const [minScore, setMinScore] = useState(80)
   const [openScoreDropdown, setOpenScoreDropdown] = useState(false)
   const scoreRef = useRef<HTMLDivElement | null>(null)
 
@@ -158,7 +98,6 @@ export default function ResultsTable({ results }: Props) {
     []
   )
 
-  // Helper function to format year-month string for display
   const formatYearMonth = (yearMonth: string) => {
     const [year, month] = yearMonth.split('-')
     const monthIndex = parseInt(month, 10) - 1
@@ -188,7 +127,6 @@ export default function ResultsTable({ results }: Props) {
     setSelectedMonths(prev => {
       const has = prev.includes(month)
       const next = has ? prev.filter(m => m !== month) : [...prev, month]
-      // If none selected, treat as All
       return next
     })
   }
@@ -219,7 +157,6 @@ export default function ResultsTable({ results }: Props) {
     const q = tagSearch.trim().toLowerCase()
     let list = availableTags
     if (q) list = availableTags.filter(t => t.toLowerCase().includes(q))
-    // Do not mutate original; sort selected to the top
     return [...list].sort((a, b) => {
       const aSel = selectedTags.includes(a)
       const bSel = selectedTags.includes(b)
@@ -331,7 +268,7 @@ export default function ResultsTable({ results }: Props) {
       }
 
       // Score threshold filter
-      const maxScore = Math.max(m.relevanceScore, m.aiConfidence || 0)
+      const maxScore = m.relevanceScore
       if (maxScore * 100 < minScore) {
         return false
       }
@@ -344,7 +281,7 @@ export default function ResultsTable({ results }: Props) {
     const rows = results.map(r => {
       const filteredReleases = filterReleases(r.matchedReleases)
       const filteredScore = filteredReleases.length
-        ? Math.max(...filteredReleases.map(m => Math.max(m.relevanceScore, m.aiConfidence ?? 0)))
+        ? Math.max(...filteredReleases.map(m => m.relevanceScore))
         : 0
       return { result: r, filteredReleases, filteredScore }
     }).filter(x => x.filteredReleases.length > 0)
@@ -367,7 +304,7 @@ export default function ResultsTable({ results }: Props) {
             {filteredRows.length} resource type(s) • {totalVisibleMatches} matches found
           </p>
           <div className="text-xs text-slate-500">
-            <span className="font-medium">Relevance Score:</span> Based on keyword matches in titles, summaries, categories, with region match/mismatch adjustments. Only releases with 30%+ relevance are shown.
+            <span className="font-medium">Relevance Score:</span> Based on keyword matches in titles, summaries, categories, with region match/mismatch adjustments. Only releases meeting the selected relevance threshold are shown.
           </div>
         </div>
         {/* Filters */}
@@ -570,12 +507,12 @@ export default function ResultsTable({ results }: Props) {
                   <button onClick={() => setOpenScoreDropdown(false)} className="text-xs text-slate-500 hover:text-slate-700">Close</button>
                 </div>
                 <div className="space-y-2">
-                  <div className="text-xs text-slate-600 mb-2">Show only highly relevant releases (default 50%):</div>
+                  <div className="text-xs text-slate-600 mb-2">Show only highly relevant releases (default 80%):</div>
                   <div className="flex items-center space-x-2">
                     <input
                       type="range"
-                      min="10"
-                      max="90"
+                      min="0"
+                      max="100"
                       step="5"
                       value={minScore}
                       onChange={(e) => setMinScore(Number(e.target.value))}
@@ -584,14 +521,15 @@ export default function ResultsTable({ results }: Props) {
                     <div className="text-xs font-mono text-slate-700 min-w-10">{minScore}%</div>
                   </div>
                   <div className="flex items-center justify-between text-xs text-slate-500">
-                    <span>10% (show more)</span>
-                    <span>90% (strict)</span>
+                    <span>0% (show all)</span>
+                    <span>100% (perfect)</span>
                   </div>
                   <div className="mt-2 pt-2 border-t border-slate-200">
-                    <div className="grid grid-cols-3 gap-1 text-xs">
-                      <button onClick={() => setMinScore(30)} className={`px-2 py-1 rounded ${minScore === 30 ? 'bg-blue-100 text-blue-700' : 'hover:bg-slate-50'}`}>30%</button>
-                      <button onClick={() => setMinScore(60)} className={`px-2 py-1 rounded ${minScore === 60 ? 'bg-blue-100 text-blue-700' : 'hover:bg-slate-50'}`}>60%</button>
-                      <button onClick={() => setMinScore(90)} className={`px-2 py-1 rounded ${minScore === 90 ? 'bg-blue-100 text-blue-700' : 'hover:bg-slate-50'}`}>90%</button>
+                    <div className="grid grid-cols-4 gap-1 text-xs">
+                      <button onClick={() => setMinScore(0)} className={`px-2 py-1 rounded ${minScore === 0 ? 'bg-blue-100 text-blue-700' : 'hover:bg-slate-50'}`}>0%</button>
+                      <button onClick={() => setMinScore(25)} className={`px-2 py-1 rounded ${minScore === 25 ? 'bg-blue-100 text-blue-700' : 'hover:bg-slate-50'}`}>25%</button>
+                      <button onClick={() => setMinScore(50)} className={`px-2 py-1 rounded ${minScore === 50 ? 'bg-blue-100 text-blue-700' : 'hover:bg-slate-50'}`}>50%</button>
+                      <button onClick={() => setMinScore(100)} className={`px-2 py-1 rounded ${minScore === 100 ? 'bg-blue-100 text-blue-700' : 'hover:bg-slate-50'}`}>100%</button>
                     </div>
                   </div>
                 </div>
@@ -688,14 +626,6 @@ export default function ResultsTable({ results }: Props) {
                   </div>
                 </div>
 
-                {/* Top Impact Summary */}
-                {filteredReleases[0]?.aiSummary && (
-                  <div className="mt-2 p-2 bg-slate-50 rounded-md">
-                    <div className="text-xs text-slate-700">
-                      <strong>Key Impact:</strong> {filteredReleases[0]?.aiSummary}
-                    </div>
-                  </div>
-                )}
               </div>
 
               {/* Expanded Details */}
@@ -723,16 +653,6 @@ export default function ResultsTable({ results }: Props) {
                           </div>
                         </div>
 
-                        {match.aiSummary && (
-                          <div className="mb-2 p-2 bg-blue-50/50 border border-blue-100 rounded-md">
-                            <div className="text-xs text-slate-700">{match.aiSummary}</div>
-                            {match.aiConfidence != null && (
-                              <div className="text-xs text-blue-600 mt-1">
-                                AI: {(match.aiConfidence * 100).toFixed(0)}%
-                              </div>
-                            )}
-                          </div>
-                        )}
 
                         {/* Prefer RSS categories as tags; fall back to reasons */}
                         {(match.categories?.length || 0) > 0 ? (
