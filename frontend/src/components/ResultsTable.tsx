@@ -1,0 +1,696 @@
+import { useEffect, useMemo, useRef, useState } from 'react'
+import type { MatchResult } from '../lib/types'
+
+interface Props {
+  results: MatchResult[]
+}
+
+function getTagClasses(tag: string): string {
+  const t = tag.toLowerCase()
+  // Status-like tags (strong semantics)
+  if (/(launched|generally available|general availability|\bga\b)/.test(t)) {
+    return 'bg-green-100 text-green-800 border border-green-200'
+  }
+  if (/(in preview|public preview|private preview|preview)/.test(t)) {
+    return 'bg-yellow-100 text-yellow-800 border border-yellow-200'
+  }
+
+  // Default/product tags → neutral gray
+  return 'bg-slate-100 text-slate-700 border border-slate-200'
+}
+
+function ScoreBar({ score }: { score: number }) {
+  const percentage = Math.min(score * 100, 100) // Scores are 0-1, so multiply by 100
+  const getColor = (score: number) => {
+    if (score >= 0.7) return 'bg-green-500'   // 70%+ = High relevance
+    if (score >= 0.5) return 'bg-yellow-500' // 50-70% = Medium relevance  
+    return 'bg-orange-500'                    // 30-50% = Lower relevance (not red since all matches are decent)
+  }
+
+  return (
+    <div className="flex items-center space-x-1">
+      <div className="w-12 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+        <div 
+          className={`h-full rounded-full transition-all duration-300 ${getColor(score)}`}
+          style={{ width: `${percentage}%` }}
+        />
+      </div>
+      <span className="text-xs text-slate-600 font-mono">{Math.round(score * 100)}%</span>
+    </div>
+  )
+}
+
+function ImpactBadge({ level }: { level: 'high' | 'medium' | 'low' | null }) {
+  if (!level) return <span className="text-slate-400 text-xs">No matches</span>
+  
+  const config = {
+    high: { 
+      style: 'bg-green-100 text-green-700 border-green-200',
+      label: 'High Match',
+      title: '70%+ relevance - Strong keyword matches in title/summary'
+    },
+    medium: { 
+      style: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+      label: 'Good Match',
+      title: '50-70% relevance - Some keyword matches found'
+    },
+    low: { 
+      style: 'bg-orange-100 text-orange-700 border-orange-200',
+      label: 'Possible',
+      title: '30-50% relevance - Weak keyword matches or fuzzy matching'
+    }
+  }
+  
+  const { style, label, title } = config[level]
+  
+  return (
+    <span 
+      className={`px-2 py-1 text-xs font-medium rounded-full border ${style} cursor-help`}
+      title={title}
+    >
+      {label}
+    </span>
+  )
+}
+
+export default function ResultsTable({ results }: Props) {
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({})
+  const [openMonthDropdown, setOpenMonthDropdown] = useState(false)
+  const [openStatusDropdown, setOpenStatusDropdown] = useState(false)
+  const [openTagsDropdown, setOpenTagsDropdown] = useState(false)
+  const monthRef = useRef<HTMLDivElement | null>(null)
+  const statusRef = useRef<HTMLDivElement | null>(null)
+  const tagsRef = useRef<HTMLDivElement | null>(null)
+  const [selectedMonths, setSelectedMonths] = useState<string[]>([])
+  const [selectedStatuses, setSelectedStatuses] = useState<Array<'launched' | 'preview'>>([])
+  const [selectedTags, setSelectedTags] = useState<string[]>([])
+  const [tagSearch, setTagSearch] = useState('')
+  const [showEntraOnly, setShowEntraOnly] = useState(false)
+  const [minScore, setMinScore] = useState(80)
+  const [openScoreDropdown, setOpenScoreDropdown] = useState(false)
+  const scoreRef = useRef<HTMLDivElement | null>(null)
+
+  const monthNames = useMemo(
+    () => [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ],
+    []
+  )
+
+  const formatYearMonth = (yearMonth: string) => {
+    const [year, month] = yearMonth.split('-')
+    const monthIndex = parseInt(month, 10) - 1
+    return `${monthNames[monthIndex]} (${year})`
+  }
+
+  // Collect available year-month combinations from all matched releases
+  const availableMonths = useMemo(() => {
+    const yearMonthSet = new Set<string>()
+    for (const r of results) {
+      for (const m of r.matchedReleases) {
+        const d = new Date(m.published)
+        if (!isNaN(d.getTime())) {
+          const yearMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+          yearMonthSet.add(yearMonth)
+        }
+      }
+    }
+    // Sort by most recent first (2025-11, 2025-10, 2024-12, etc.)
+    return Array.from(yearMonthSet).sort((a, b) => b.localeCompare(a))
+  }, [results])
+
+  const isAllMonths = selectedMonths.length === 0
+  const isAllStatuses = selectedStatuses.length === 0
+  const isAllTags = selectedTags.length === 0
+  const toggleMonth = (month: string) => {
+    setSelectedMonths(prev => {
+      const has = prev.includes(month)
+      const next = has ? prev.filter(m => m !== month) : [...prev, month]
+      return next
+    })
+  }
+  const selectAllMonths = () => setSelectedMonths([])
+
+  const toggleStatus = (status: 'launched' | 'preview') => {
+    setSelectedStatuses(prev => {
+      const has = prev.includes(status)
+      const next = has ? prev.filter(s => s !== status) : [...prev, status]
+      return next
+    })
+  }
+  const selectAllStatuses = () => setSelectedStatuses([])
+
+  // Collect available category tags across all releases
+  const availableTags = useMemo(() => {
+    const set = new Set<string>()
+    for (const r of results) {
+      for (const m of r.matchedReleases) {
+        for (const c of m.categories || []) set.add(c)
+      }
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b))
+  }, [results])
+
+  // Filter and order tags for the dropdown: match search and show selected first
+  const filteredTags = useMemo(() => {
+    const q = tagSearch.trim().toLowerCase()
+    let list = availableTags
+    if (q) list = availableTags.filter(t => t.toLowerCase().includes(q))
+    return [...list].sort((a, b) => {
+      const aSel = selectedTags.includes(a)
+      const bSel = selectedTags.includes(b)
+      if (aSel && !bSel) return -1
+      if (!aSel && bSel) return 1
+      return a.localeCompare(b)
+    })
+  }, [availableTags, tagSearch, selectedTags])
+
+  const toggleTag = (tag: string) => {
+    setSelectedTags(prev => {
+      const has = prev.includes(tag)
+      const next = has ? prev.filter(t => t !== tag) : [...prev, tag]
+      return next
+    })
+  }
+  const selectAllTags = () => setSelectedTags([])
+
+  // Close dropdowns on outside click
+  useEffect(() => {
+    function onDocMouseDown(e: MouseEvent) {
+      const t = e.target as Node
+      if (openMonthDropdown && monthRef.current && !monthRef.current.contains(t)) setOpenMonthDropdown(false)
+      if (openStatusDropdown && statusRef.current && !statusRef.current.contains(t)) setOpenStatusDropdown(false)
+      if (openTagsDropdown && tagsRef.current && !tagsRef.current.contains(t)) setOpenTagsDropdown(false)
+      if (openScoreDropdown && scoreRef.current && !scoreRef.current.contains(t)) setOpenScoreDropdown(false)
+    }
+    document.addEventListener('mousedown', onDocMouseDown)
+    return () => document.removeEventListener('mousedown', onDocMouseDown)
+  }, [openMonthDropdown, openStatusDropdown, openTagsDropdown, openScoreDropdown])
+
+  // Clear tag search when closing the dropdown
+  useEffect(() => {
+    if (!openTagsDropdown) setTagSearch('')
+  }, [openTagsDropdown])
+
+  if (!results.length) return null
+
+  const sortedResults = [...results].sort((a, b) => b.overallScore - a.overallScore)
+
+  // Helper to check if a release is Entra-related
+  const isEntraRelated = (item: MatchResult['matchedReleases'][0]) => {
+    const text = `${item.title} ${(item.categories || []).join(' ')}`.toLowerCase()
+    
+    // Check for explicit Microsoft Entra mentions
+    if (text.includes('microsoft entra') || text.includes('entra id')) {
+      return true
+    }
+    
+    // Check for Entra-related categories
+    const categories = (item.categories || []).map(c => c.toLowerCase())
+    if (categories.includes('identity') || categories.includes('microsoft entra domain services')) {
+      return true
+    }
+    
+    // Check for identity and authentication keywords
+    const entraKeywords = [
+      'azure active directory', 'azure ad', 'aad',
+      'identity management', 'identity provider', 'identity platform',
+      'authentication', 'authorization', 'single sign-on', 'sso',
+      'conditional access', 'privileged identity', 'pim',
+      'multi-factor authentication', 'mfa', 'active directory',
+      'managed identity', 'service principal', 'rbac',
+      'application proxy', 'b2c', 'external id',
+      'directory services', 'domain services', 'ldap',
+      'kerberos authentication', 'saml', 'oauth', 'openid connect'
+    ]
+    
+    return entraKeywords.some(keyword => text.includes(keyword))
+  }
+
+  // Helper to filter a list of releases based on selected filters
+  const filterReleases = (items: MatchResult['matchedReleases']) => {
+    const launchedRegex = /(launched|generally available|general availability|\bga\b)/i
+    const previewRegex = /(in preview|public preview|private preview|preview)/i
+
+    return items.filter(m => {
+      // Month filter
+      if (!isAllMonths) {
+        const d = new Date(m.published)
+        if (isNaN(d.getTime())) return false
+        const yearMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+        if (!selectedMonths.includes(yearMonth)) return false
+      }
+
+      // Status filter
+      if (!isAllStatuses) {
+        const text = `${m.title} ${(m.categories || []).join(' ')}`
+        const isLaunched = launchedRegex.test(text)
+        const isPreview = previewRegex.test(text)
+        const statusMatch = (
+          (selectedStatuses.includes('launched') && isLaunched) ||
+          (selectedStatuses.includes('preview') && isPreview)
+        )
+        if (!statusMatch) return false
+      }
+
+      // Tags filter (OR semantics)
+      if (!isAllTags) {
+        const cats = (m.categories || [])
+        const catsLower = cats.map(c => c.toLowerCase())
+        const anyTag = selectedTags.some(t => catsLower.includes(t.toLowerCase()))
+        if (!anyTag) return false
+      }
+
+      // Entra filter
+      if (showEntraOnly && !isEntraRelated(m)) {
+        return false
+      }
+
+      // Score threshold filter
+      const maxScore = m.relevanceScore
+      if (maxScore * 100 < minScore) {
+        return false
+      }
+
+      return true
+    })
+  }
+
+  const filteredRows = useMemo(() => {
+    const rows = results.map(r => {
+      const filteredReleases = filterReleases(r.matchedReleases)
+      const filteredScore = filteredReleases.length
+        ? Math.max(...filteredReleases.map(m => m.relevanceScore))
+        : 0
+      return { result: r, filteredReleases, filteredScore }
+    }).filter(x => x.filteredReleases.length > 0)
+
+    // Sort by filtered score desc, then by resource count desc as tiebreaker
+    rows.sort((a, b) => (b.filteredScore - a.filteredScore) || (b.result.resourceCount - a.result.resourceCount))
+    return rows
+  }, [results, selectedMonths, selectedStatuses, selectedTags, showEntraOnly, minScore])
+
+  const totalVisibleMatches = useMemo(() => {
+    return filteredRows.reduce((sum, r) => sum + r.filteredReleases.length, 0)
+  }, [filteredRows])
+
+  return (
+    <div className="card-elevated p-4 animate-fade-in">
+      <div className="flex items-start justify-between mb-4">
+        <div>
+          <h2 className="text-xl font-bold text-slate-800 mb-1">📋 Analysis Results</h2>
+          <p className="text-xs text-slate-600 mb-2">
+            {filteredRows.length} resource type(s) • {totalVisibleMatches} matches found
+          </p>
+          <div className="text-xs text-slate-500">
+            <span className="font-medium">Relevance Score:</span> Based on keyword matches in titles, summaries, categories, with region match/mismatch adjustments. Only releases meeting the selected relevance threshold are shown.
+          </div>
+        </div>
+        {/* Filters */}
+        <div className="flex items-center gap-2">
+          {/* Month filter */}
+          <div className="relative" ref={monthRef}>
+          <button
+            type="button"
+            onClick={() => setOpenMonthDropdown(o => !o)}
+            className="inline-flex items-center gap-2 px-3 py-1.5 text-xs rounded border border-slate-300 bg-white hover:bg-slate-50 whitespace-nowrap"
+          >
+            <svg className="w-3 h-3 text-slate-600" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3M3 11h18M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2h-1M5 5H4a2 2 0 00-2 2v10a2 2 0 002 2" />
+            </svg>
+            {isAllMonths ? 'All months' : `${selectedMonths.length} month${selectedMonths.length > 1 ? 's' : ''}`}
+            <svg className={`w-3 h-3 transform ${openMonthDropdown ? 'rotate-180' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          {openMonthDropdown && (
+            <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded shadow-lg z-10 p-2">
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-xs font-medium text-slate-700">Filter by month</div>
+                <div className="flex items-center gap-2">
+                  <button onClick={selectAllMonths} className="text-xs text-slate-500 hover:text-slate-700">Clear</button>
+                  <button onClick={() => setOpenMonthDropdown(false)} className="text-xs text-slate-500 hover:text-slate-700">Close</button>
+                </div>
+              </div>
+              <div className="mb-2">
+                <label className="flex items-center gap-2 text-xs cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isAllMonths}
+                    onChange={selectAllMonths}
+                  />
+                  <span>All</span>
+                </label>
+              </div>
+              <div className="max-h-48 overflow-auto pr-1">
+                {availableMonths.length === 0 && (
+                  <div className="text-xs text-slate-500">No months available</div>
+                )}
+                {availableMonths.map((yearMonth) => (
+                  <label key={yearMonth} className="flex items-center gap-2 py-0.5 text-xs cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={selectedMonths.includes(yearMonth)}
+                      onChange={() => toggleMonth(yearMonth)}
+                    />
+                    <span>{formatYearMonth(yearMonth)}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+          </div>
+
+          {/* Status filter */}
+          <div className="relative" ref={statusRef}>
+            <button
+              type="button"
+              onClick={() => setOpenStatusDropdown(o => !o)}
+              className="inline-flex items-center gap-2 px-3 py-1.5 text-xs rounded border border-slate-300 bg-white hover:bg-slate-50 whitespace-nowrap"
+            >
+              <svg className="w-3 h-3 text-slate-600" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 12h14M5 6h14M5 18h14" />
+              </svg>
+              {isAllStatuses ? 'All status' : `${selectedStatuses.length} selected`}
+              <svg className={`w-3 h-3 transform ${openStatusDropdown ? 'rotate-180' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            {openStatusDropdown && (
+              <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded shadow-lg z-10 p-2">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-xs font-medium text-slate-700">Filter by status</div>
+                  <div className="flex items-center gap-2">
+                    <button onClick={selectAllStatuses} className="text-xs text-slate-500 hover:text-slate-700">Clear</button>
+                    <button onClick={() => setOpenStatusDropdown(false)} className="text-xs text-slate-500 hover:text-slate-700">Close</button>
+                  </div>
+                </div>
+                <div className="mb-2">
+                  <label className="flex items-center gap-2 text-xs cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={isAllStatuses}
+                      onChange={selectAllStatuses}
+                    />
+                    <span>All</span>
+                  </label>
+                </div>
+                <div className="space-y-1">
+                  <label className="flex items-center gap-2 text-xs cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={selectedStatuses.includes('launched')}
+                      onChange={() => toggleStatus('launched')}
+                    />
+                    <span>Launched</span>
+                  </label>
+                  <label className="flex items-center gap-2 text-xs cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={selectedStatuses.includes('preview')}
+                      onChange={() => toggleStatus('preview')}
+                    />
+                    <span>In preview</span>
+                  </label>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Tags filter */}
+          <div className="relative" ref={tagsRef}>
+            <button
+              type="button"
+              onClick={() => setOpenTagsDropdown(o => !o)}
+              className="inline-flex items-center gap-2 px-3 py-1.5 text-xs rounded border border-slate-300 bg-white hover:bg-slate-50 whitespace-nowrap"
+            >
+              <svg className="w-3 h-3 text-slate-600" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 7l10 10M7 17L17 7" />
+              </svg>
+              {isAllTags ? 'All tags' : `${selectedTags.length} tag${selectedTags.length > 1 ? 's' : ''}`}
+              <svg className={`w-3 h-3 transform ${openTagsDropdown ? 'rotate-180' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            {openTagsDropdown && (
+              <div className="absolute right-0 mt-2 w-72 bg-white border border-slate-200 rounded shadow-lg z-10 p-2">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-xs font-medium text-slate-700">Filter by tag</div>
+                  <div className="flex items-center gap-2">
+                    <button onClick={selectAllTags} className="text-xs text-slate-500 hover:text-slate-700">Clear</button>
+                    <button onClick={() => setOpenTagsDropdown(false)} className="text-xs text-slate-500 hover:text-slate-700">Close</button>
+                  </div>
+                </div>
+                {/* Search within tags */}
+                <div className="mb-2">
+                  <input
+                    type="text"
+                    value={tagSearch}
+                    onChange={e => setTagSearch(e.target.value)}
+                    placeholder="Search tags..."
+                    className="w-full px-2 py-1 text-xs border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-300"
+                  />
+                </div>
+                <div className="mb-2">
+                  <label className="flex items-center gap-2 text-xs cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={isAllTags}
+                      onChange={selectAllTags}
+                    />
+                    <span>All</span>
+                  </label>
+                </div>
+                <div className="max-h-60 overflow-auto pr-1">
+                  {filteredTags.length === 0 && (
+                    <div className="text-xs text-slate-500">{tagSearch ? 'No matching tags' : 'No tags available'}</div>
+                  )}
+                  {filteredTags.map((t) => (
+                    <label key={t} className="flex items-center gap-2 py-0.5 text-xs cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={selectedTags.includes(t)}
+                        onChange={() => toggleTag(t)}
+                      />
+                      <span className="truncate" title={t}>{t}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Score threshold filter */}
+          <div className="relative" ref={scoreRef}>
+            <button
+              type="button"
+              onClick={() => setOpenScoreDropdown(o => !o)}
+              className="inline-flex items-center gap-2 px-3 py-1.5 text-xs rounded border border-slate-300 bg-white hover:bg-slate-50 whitespace-nowrap"
+            >
+              <svg className="w-3 h-3 text-slate-600" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              Score ≥ {minScore}%
+              <svg className={`w-3 h-3 transform ${openScoreDropdown ? 'rotate-180' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            {openScoreDropdown && (
+              <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded shadow-lg z-10 p-3">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="text-xs font-medium text-slate-700">Minimum relevance score</div>
+                  <button onClick={() => setOpenScoreDropdown(false)} className="text-xs text-slate-500 hover:text-slate-700">Close</button>
+                </div>
+                <div className="space-y-2">
+                  <div className="text-xs text-slate-600 mb-2">Show only highly relevant releases (default 80%):</div>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      step="5"
+                      value={minScore}
+                      onChange={(e) => setMinScore(Number(e.target.value))}
+                      className="flex-1 h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer"
+                    />
+                    <div className="text-xs font-mono text-slate-700 min-w-10">{minScore}%</div>
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-slate-500">
+                    <span>0% (show all)</span>
+                    <span>100% (perfect)</span>
+                  </div>
+                  <div className="mt-2 pt-2 border-t border-slate-200">
+                    <div className="grid grid-cols-4 gap-1 text-xs">
+                      <button onClick={() => setMinScore(0)} className={`px-2 py-1 rounded ${minScore === 0 ? 'bg-blue-100 text-blue-700' : 'hover:bg-slate-50'}`}>0%</button>
+                      <button onClick={() => setMinScore(25)} className={`px-2 py-1 rounded ${minScore === 25 ? 'bg-blue-100 text-blue-700' : 'hover:bg-slate-50'}`}>25%</button>
+                      <button onClick={() => setMinScore(50)} className={`px-2 py-1 rounded ${minScore === 50 ? 'bg-blue-100 text-blue-700' : 'hover:bg-slate-50'}`}>50%</button>
+                      <button onClick={() => setMinScore(100)} className={`px-2 py-1 rounded ${minScore === 100 ? 'bg-blue-100 text-blue-700' : 'hover:bg-slate-50'}`}>100%</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Entra filter checkbox */}
+          <div className="flex items-center">
+            <label className="flex items-center gap-2 px-3 py-1.5 text-xs rounded border border-slate-300 bg-white hover:bg-slate-50 cursor-pointer whitespace-nowrap">
+              <input
+                type="checkbox"
+                checked={showEntraOnly}
+                onChange={(e) => setShowEntraOnly(e.target.checked)}
+                className="w-3 h-3"
+              />
+              <svg className="w-3 h-3 text-slate-600" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>Entra only</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        {filteredRows.length === 0 && (
+          <div className="text-xs text-slate-500 p-3 border border-slate-200 rounded bg-slate-50">
+            No results match the current filters.
+          </div>
+        )}
+        {filteredRows.map(({ result, filteredReleases, filteredScore }, index) => {
+          const isExpanded = expanded[result.resourceType]
+          const hasMatches = filteredReleases.length > 0
+          const impactLevel = filteredScore >= 0.7 ? 'high' : filteredScore >= 0.5 ? 'medium' : filteredScore > 0 ? 'low' : null
+
+          return (
+            <div 
+              key={result.resourceType} 
+              className="bg-white rounded-lg border border-slate-200 shadow-sm hover:shadow-md transition-all duration-200"
+              style={{ animationDelay: `${index * 0.05}s` }}
+            >
+              <div className="p-3">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-center">
+                  {/* Resource Type */}
+                  <div className="lg:col-span-5">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-2 h-2 bg-indigo-500 rounded-full flex-shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <div className="font-mono text-xs font-semibold text-slate-800 truncate" title={result.resourceType}>
+                          {result.resourceType}
+                        </div>
+                        <div className="text-xs text-slate-500">
+                          {result.resourceCount} resource{result.resourceCount !== 1 ? 's' : ''}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Matches */}
+                  <div className="lg:col-span-2">
+                    <div className="status-badge bg-blue-100 text-blue-800 text-xs px-2 py-1">
+                      {filteredReleases.length}
+                    </div>
+                  </div>
+
+                  {/* Impact Level */}
+                  <div className="lg:col-span-2">
+                    <ImpactBadge level={impactLevel} />
+                  </div>
+
+                  {/* Score */}
+                  <div className="lg:col-span-2">
+                    <ScoreBar score={filteredScore} />
+                  </div>
+
+                  {/* Actions */}
+                  <div className="lg:col-span-1 flex justify-end">
+                    {hasMatches && (
+                      <button
+                        className="p-1 hover:bg-slate-100 rounded transition-colors"
+                        onClick={() => setExpanded(s => ({ ...s, [result.resourceType]: !s[result.resourceType] }))}
+                      >
+                        <svg 
+                          className={`w-3 h-3 transform transition-transform ${isExpanded ? 'rotate-180' : ''} text-slate-600`}
+                          fill="none" 
+                          stroke="currentColor" 
+                          viewBox="0 0 24 24"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Expanded Details */}
+              {isExpanded && (
+                <div className="px-3 pb-3 animate-slide-in">
+                  <div className="border-t border-slate-200 pt-2 space-y-2">
+                    {filteredReleases.map((match, matchIndex) => (
+                      <div key={match.id} className="bg-gradient-to-r from-slate-50/50 to-white rounded-md p-3 border border-slate-100">
+                        <div className="flex items-start justify-between mb-2">
+                          <a 
+                            className="text-slate-900 hover:text-slate-700 font-medium text-xs hover:underline transition-colors flex-1 mr-3" 
+                            href={match.link} 
+                            target="_blank" 
+                            rel="noreferrer"
+                          >
+                            {match.title}
+                          </a>
+                          <div className="flex items-center space-x-2 flex-shrink-0">
+                            <span className="text-xs text-slate-500">
+                              {new Date(match.published).toLocaleDateString()}
+                            </span>
+                            <div className="w-12">
+                              <ScoreBar score={match.relevanceScore} />
+                            </div>
+                          </div>
+                        </div>
+
+
+                        {/* Prefer RSS categories as tags; fall back to reasons */}
+                        {(match.categories?.length || 0) > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {match.categories!.map((cat, idx) => (
+                              <span
+                                key={idx}
+                                className={`px-1.5 py-0.5 text-xs rounded-full ${getTagClasses(cat)}`}
+                                title="Feed tag"
+                              >
+                                {cat}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          match.reasons && match.reasons.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              {match.reasons.map((reason, reasonIndex) => (
+                                <span 
+                                  key={reasonIndex}
+                                  className="px-1.5 py-0.5 bg-slate-100 text-slate-700 border border-slate-200 text-xs rounded-full"
+                                  title="Match reason"
+                                >
+                                  {reason}
+                                </span>
+                              ))}
+                            </div>
+                          )
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
