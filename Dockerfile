@@ -20,7 +20,7 @@ RUN npm run build
 FROM node:20-bookworm-slim
 
 # Install basic dependencies
-RUN apt-get update && apt-get install -y bash curl ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y curl ca-certificates && rm -rf /var/lib/apt/lists/*
 
 ENV NODE_ENV=production \
     PORT=8787
@@ -36,10 +36,6 @@ COPY --from=server-builder /app/server/dist /app/server/dist
 RUN mkdir -p /app/server/dist/public
 COPY --from=frontend-builder /app/frontend/dist /app/server/dist/public
 
-# Add startup script to run Node server
-COPY ./start.sh /app/start.sh
-RUN chmod +x /app/start.sh
-
 EXPOSE 8787
 
-CMD ["/app/start.sh"]
+CMD ["node", "/app/server/dist/index.js"]
