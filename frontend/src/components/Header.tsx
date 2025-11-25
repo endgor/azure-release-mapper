@@ -15,7 +15,7 @@ export default function Header({ isCompact = false }: HeaderProps) {
       <div className={`relative container mx-auto px-6 ${isCompact ? 'header-compact' : 'header-expanded'}`}>
         <div className="animate-fade-in">
           <h1 className={`font-bold tracking-tight text-white ${isCompact ? 'header-title-compact' : 'header-title-expanded'}`}>
-            <span className="block">CloudOps Azure</span>
+            <span className="block">Azure</span>
             <span className="block bg-gradient-to-r from-blue-200 to-cyan-200 bg-clip-text text-transparent">
               Release Mapper
             </span>

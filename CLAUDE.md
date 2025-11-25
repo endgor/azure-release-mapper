@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-CloudOps Azure Release Mapper is a full-stack web application that matches Azure release announcements to a user's existing infrastructure. Users upload CSV exports of their Azure resources, and the app correlates them with Azure RSS feed updates using intelligent heuristic scoring.
+Azure Release Mapper is a full-stack web application that matches Azure release announcements to a user's existing infrastructure. Users upload CSV exports of their Azure resources, and the app correlates them with Azure RSS feed updates using intelligent heuristic scoring.
 
 **Tech Stack:**
 - Frontend: React + TypeScript + Vite + Tailwind CSS
@@ -34,8 +34,8 @@ In development, the frontend proxies API calls to `http://localhost:8787/api/rss
 
 ### Docker
 ```bash
-docker build -t cloudops-release-mapper .
-docker run -p 8787:8787 cloudops-release-mapper
+docker build -t azure-release-mapper .
+docker run -p 8787:8787 azure-release-mapper
 ```
 
 The Dockerfile is a multi-stage build that:
@@ -47,8 +47,8 @@ The Dockerfile is a multi-stage build that:
 ## Architecture
 
 ### Data Flow
-1. **CSV Upload**: User uploads Azure Portal "All resources" export or CloudOps environment export
-2. **CSV Parsing** (`frontend/src/lib/csv.ts`): Auto-detects format (Azure vs CloudOps), normalizes resource types and regions into `RegionAwareInventory`
+1. **CSV Upload**: User uploads Azure Portal "All resources" export
+2. **CSV Parsing** (`frontend/src/lib/csv.ts`): Parses Azure format, normalizes resource types and regions into `RegionAwareInventory`
 3. **RSS Feed Fetch** (`server/src/rss.ts`, `frontend/src/lib/rss.ts`): Backend fetches Azure Updates RSS feed, frontend calls `/api/rss`
 4. **Matching Logic** (`frontend/src/lib/match.ts`): Core heuristic algorithm matches releases to resources
 5. **Results Display** (`frontend/src/components/ResultsTable.tsx`): Shows matched releases sorted by relevance score
@@ -87,7 +87,7 @@ Key functions:
 - Covers Compute, Network, Storage, Database, App Services, Containers, AI/ML, Security, Monitoring
 
 **CSV Parsing** (`frontend/src/lib/csv.ts`):
-- Detects Azure Portal vs CloudOps export format by headers
+- Parses Azure Portal "All resources" export format by headers
 - Normalizes resource types: lowercases, handles `Microsoft.*` prefix variations
 - Normalizes regions: comprehensive mapping of Azure region names/aliases/codes
 - Returns `RegionAwareInventory` with `byType: Map<string, number>` and `regions: Set<string>`
@@ -111,8 +111,8 @@ Key functions:
 The `.github/workflows/deploy.yml` pipeline automatically:
 1. Creates semantic version tags on push to `main`
 2. Builds Docker image with multi-stage build
-3. Pushes to Azure Container Registry (`acrcloudopsreleasemapper.azurecr.io`)
-4. Deploys to Azure Container Apps (`ca-cloudops-release-mapper`)
+3. Pushes to Azure Container Registry (`acrazurereleasemapper.azurecr.io`)
+4. Deploys to Azure Container Apps (`ca-azure-release-mapper`)
 
 **Required GitHub Secrets:**
 - `AZURE_CLIENT_ID`
@@ -120,15 +120,15 @@ The `.github/workflows/deploy.yml` pipeline automatically:
 - `AZURE_SUBSCRIPTION_ID`
 
 **Azure Resources:**
-- Resource Group: `rg-cloudops-release-mapper`
-- Container App: `ca-cloudops-release-mapper`
-- ACR: `acrcloudopsreleasemapper`
+- Resource Group: `rg-azure-release-mapper`
+- Container App: `ca-azure-release-mapper`
+- ACR: `acrazurereleasemapper`
 - Region: `westeurope`
 
 ### Manual Deployment
 ```bash
 # Build and push to ACR
-az acr build -r acrcloudopsreleasemapper -t acrcloudopsreleasemapper.azurecr.io/cloudops-release-mapper:latest .
+az acr build -r acrazurereleasemapper -t acrazurereleasemapper.azurecr.io/azure-release-mapper:latest .
 
 # Or use Bicep IaC
 az deployment sub create -l westeurope -f infra/main.bicep -p infra/main.bicepparam
@@ -138,7 +138,6 @@ az deployment sub create -l westeurope -f infra/main.bicep -p infra/main.biceppa
 
 ### Resource Type Normalization
 - Azure format: `Microsoft.Compute/virtualMachines`
-- CloudOps format: `type=Compute`, `sub_type=virtualMachines` → joined as `Compute/virtualMachines`
 - All normalized to lowercase with preserved provider namespace
 
 ### Region Normalization

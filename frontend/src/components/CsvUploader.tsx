@@ -25,7 +25,7 @@ export default function CsvUploader({ onParsed }: Props) {
     try {
       const inv = await parseResourceCsvWithRegions(file)
       if (inv.byType.size === 0) {
-        setError('No resource type values found. Check CSV headers for Azure ("RESOURCE TYPE") or CloudOps ("type"/"sub_type").')
+        setError('No resource type values found. Make sure your CSV has a "RESOURCE TYPE" column from Azure Portal export.')
       } else {
         setUniqueCount(inv.byType.size)
         onParsed(inv)
@@ -63,7 +63,7 @@ export default function CsvUploader({ onParsed }: Props) {
       <div className="flex items-start justify-between mb-6">
         <div>
           <h3 className="text-lg font-semibold text-slate-800 mb-2">📊 Resource Inventory</h3>
-          <p className="text-sm text-slate-600 mb-1">Export "All resources" CSV from Azure portal (include 'Resource Type' column in the export) or export the CSV file from CloudOps portal, then upload it here.</p>
+          <p className="text-sm text-slate-600 mb-1">Export "All resources" CSV from Azure Portal (include 'Resource Type' column in the export) and upload it here.</p>
         </div>
       </div>
 

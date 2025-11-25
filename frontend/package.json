@@ -1,6 +1,6 @@
 {
-  "name": "cloudops-azure-release-mapper",
-  "description": "CloudOps Azure Release Mapper – map Azure release notes to your resources.",
+  "name": "azure-release-mapper",
+  "description": "Azure Release Mapper – map Azure release notes to your resources.",
   "version": "0.1.0",
   "private": true,
   "type": "module",

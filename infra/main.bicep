@@ -29,7 +29,7 @@ param sourceRepoUrl string
 
 // Create Resource Group
 module rg 'rg.bicep' = {
-  name: 'rg-cloudops-release-mapper'
+  name: 'rg-azure-release-mapper'
   params: {
     location: location
     resourceGroupName: resourceGroupName
@@ -38,7 +38,7 @@ module rg 'rg.bicep' = {
 
 // Deploy ACR into RG
 module acr 'acr.bicep' = {
-  name: 'acr-cloudops-release-mapper'
+  name: 'acr-azure-release-mapper'
   scope: resourceGroup(resourceGroupName)
   dependsOn: [ rg ]
   params: {
@@ -49,7 +49,7 @@ module acr 'acr.bicep' = {
 
 // Optional: Build and push image to ACR via cloud build (ACR Build) using sourceRepoUrl
 module build 'build-image.bicep' = if (doBuild) {
-  name: 'build-cloudops-image'
+  name: 'build-azure-image'
   scope: resourceGroup(resourceGroupName)
   dependsOn: [ acr ]
   params: {
@@ -65,7 +65,7 @@ var imageRef = doBuild ? build.outputs.builtImage : '${containerRegistryName}.az
 
 // Deploy Container App + environment
 module app 'containerapp.bicep' = {
-  name: 'ca-cloudops-release-mapper'
+  name: 'ca-azure-release-mapper'
   scope: resourceGroup(resourceGroupName)
   dependsOn: doBuild ? [ rg, acr, build ] : [ rg, acr ]
   params: {

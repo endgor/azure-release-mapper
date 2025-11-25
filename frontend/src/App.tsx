@@ -150,7 +150,7 @@ export default function App() {
       <footer className="bg-white/50 backdrop-blur-sm border-t border-slate-200/50 py-4 mt-12">
         <div className="container mx-auto px-6 text-center">
           <a 
-            href="https://github.com/endgor/cloudops-release-mapper"
+            href="https://github.com/endgor/azure-release-mapper"
             target="_blank"
             rel="noreferrer"
             className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-slate-100 hover:bg-slate-200 transition-colors"

@@ -26,25 +26,6 @@ function normalizeResourceType(resourceType: string): string {
   return resourceType.toLowerCase().trim()
 }
 
-function toResourceTypeFromCloudOps(row: any): string {
-  const typeRaw = getField(row, ['type', 'Type', 'entity_type'])?.trim()
-  const subTypeRaw = getField(row, ['sub_type', 'Sub_Type', 'subType', 'entity_sub_type'])?.trim()
-
-  let resourceType = ''
-
-  if (typeRaw && typeRaw.includes('/')) {
-    resourceType = typeRaw
-  } else if (typeRaw && subTypeRaw) {
-    resourceType = `${typeRaw}/${subTypeRaw}`
-  } else if (typeRaw) {
-    resourceType = typeRaw
-  } else if (subTypeRaw) {
-    resourceType = subTypeRaw
-  }
-
-  return normalizeResourceType(resourceType)
-}
-
 function toResourceTypeFromAzure(row: any): string {
   const raw = row?.['RESOURCE TYPE'] ?? row?.['Resource Type'] ?? row?.['resource type']
   const resourceType = String(raw ?? '').trim()
@@ -54,11 +35,6 @@ function toResourceTypeFromAzure(row: any): string {
 function isAzureAllResources(headers: string[]): boolean {
   const h = headers.map(normalizeHeader)
   return h.includes('resource_type') || h.includes('resource\u00a0type') || h.includes('resource\u2002type')
-}
-
-function isCloudOpsExport(headers: string[]): boolean {
-  const h = headers.map(normalizeHeader)
-  return h.includes('type') || h.includes('sub_type') || h.includes('entity_type')
 }
 
 function normalizeRegion(v?: string): string {
@@ -211,16 +187,11 @@ export async function parseResourceCsvWithRegions(file: File): Promise<RegionAwa
         const headers: string[] = (res.meta?.fields as string[]) || []
 
         const azure = isAzureAllResources(headers)
-        const cloudops = isCloudOpsExport(headers)
 
         for (const row of rows) {
           let rt = ''
           if (azure) {
             rt = toResourceTypeFromAzure(row)
-          } else if (cloudops) {
-            rt = toResourceTypeFromCloudOps(row)
-          } else {
-            rt = toResourceTypeFromAzure(row) || toResourceTypeFromCloudOps(row)
           }
           rt = String(rt || '').trim()
           if (!rt) continue

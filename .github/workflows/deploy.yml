@@ -20,11 +20,11 @@ env:
   AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
 
   # Azure resources
-  RESOURCE_GROUP: rg-cloudops-release-mapper
-  CONTAINER_APP: ca-cloudops-release-mapper
-  ACR_NAME: acrcloudopsreleasemapper
-  IMAGE_NAME: cloudops-release-mapper
-  REGISTRY: acrcloudopsreleasemapper.azurecr.io
+  RESOURCE_GROUP: rg-azure-release-mapper
+  CONTAINER_APP: ca-azure-release-mapper
+  ACR_NAME: acrazurereleasemapper
+  IMAGE_NAME: azure-release-mapper
+  REGISTRY: acrazurereleasemapper.azurecr.io
 
   # Build settings
   DOCKERFILE: ./Dockerfile
