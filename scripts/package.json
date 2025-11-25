@@ -1,0 +1,11 @@
+{
+  "name": "azure-release-mapper-scripts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "fetch-rss": "node fetch-rss.js"
+  },
+  "dependencies": {
+    "rss-parser": "^3.13.0"
+  }
+}

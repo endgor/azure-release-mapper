@@ -1,9 +1,6 @@
 import type { ReleaseItem } from './types'
 
-export async function fetchRss(): Promise<ReleaseItem[]> {
-  const res = await fetch('/api/rss')
-  if (!res.ok) throw new Error('Failed to fetch RSS')
-  const data = await res.json()
+function parseItems(data: any): ReleaseItem[] {
   const items = (data.items || []) as any[]
   return items.map(i => ({
     id: String(i.id ?? i.link ?? i.title ?? ''),
@@ -15,3 +12,21 @@ export async function fetchRss(): Promise<ReleaseItem[]> {
   }))
 }
 
+export async function fetchRss(): Promise<ReleaseItem[]> {
+  // Try the backend API first (works for local dev and Docker)
+  try {
+    const res = await fetch('/api/rss')
+    if (res.ok) {
+      const data = await res.json()
+      return parseItems(data)
+    }
+  } catch {
+    // API not available, fall through to static JSON
+  }
+
+  // Fall back to static JSON (for GitHub Pages)
+  const res = await fetch(import.meta.env.BASE_URL + 'data/rss.json')
+  if (!res.ok) throw new Error('Failed to fetch RSS data')
+  const data = await res.json()
+  return parseItems(data)
+}

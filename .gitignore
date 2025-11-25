@@ -80,3 +80,6 @@ jspm_packages/
 
 # Claude
 CLAUDE.md
+
+# Auto-generated RSS data
+frontend/public/data/rss.json
