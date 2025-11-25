@@ -2,6 +2,8 @@
 
 Match Azure release announcements to your infrastructure. Upload a CSV export of your Azure resources and discover which updates are relevant to your deployed services.
 
+![Azure Release Mapper](docs/preview.jpg)
+
 ## How It Works
 
 1. Export "All resources" from Azure Portal as CSV (include the 'Resource Type' column)
